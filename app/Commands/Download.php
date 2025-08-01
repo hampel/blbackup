@@ -2,8 +2,6 @@
 
 namespace App\Commands;
 
-use App\Api;
-use App\Exceptions\BinaryLaneException;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Log;
@@ -11,10 +9,9 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
-use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
 
-class Download extends Command
+class Download extends BaseCommand
 {
     /**
      * The name and signature of the console command.
@@ -22,9 +19,8 @@ class Download extends Command
      * @var string
      */
     protected $signature = 'download
+                            {server? : download most recent backup for specified hostname or numeric server id}
                             {--i|id= : download specific backup image id}
-                            {--s|server= : download most recent backup for specified server_id}
-                            {--o|hostname= : download most recent backup for specified hostname}
                             {--f|force : force re-download of existing backup}';
 
     /**
@@ -34,136 +30,135 @@ class Download extends Command
      */
     protected $description = 'Download backups to local storage';
 
-    protected Api $api;
-
     /**
      * Execute the console command.
      */
-    public function handle(Api $api)
+    public function handle()
     {
-        $this->api = $api;
+        $imageId = $this->option('id');
 
-        try
+        if ($imageId)
         {
-            $imageId = $this->option('id');
-            $serverId = $this->option('server');
-            $hostname = $this->option('hostname');
+            $link = $this->api->link($imageId);
 
-            if ($imageId)
+            if (empty($link))
             {
-                $link = $api->link($imageId);
+                $this->fail("No download link found for image {$imageId}");
+            }
 
-                if (empty($link))
-                {
-                    $this->fail("No download link found for image {$imageId}");
-                }
+            $image = $this->api->image($imageId);
 
-                $image = $api->image($imageId);
+            if (empty($image))
+            {
+                $this->fail("No image data returned for image {$imageId}");
+            }
 
-                if (empty($image))
-                {
-                    $this->fail("No image data returned for image {$imageId}");
-                }
+            $serverId = $image['backup_info']['server_id'];
+            $server = $this->api->server($serverId);
 
-                $serverId = $image['backup_info']['server_id'];
-                $server = $api->server($serverId);
+            if (empty($server))
+            {
+                $this->fail("Could not find server {$serverId} for image {$imageId}");
+            }
+        }
+        else
+        {
+            $hostnameOrServerId = $this->argument('server');
 
-                if (empty($server))
-                {
-                    $this->fail("Could not find server {$serverId} for image {$imageId}");
+            if (empty($hostnameOrServerId))
+            {
+                $this->newLine();
+                $this->line("Backup images");
+                $this->newLine();
+
+                // no options specified, just show a list of backup images
+                $this->listImages();
+
+                $this->fail("No hostname, server_id or image_id specified");
+            }
+            elseif (is_numeric($hostnameOrServerId))
+            {
+                $server = $this->api->server($hostnameOrServerId);
+
+                if (empty($server)) {
+                    $this->fail("Could not find server {$hostnameOrServerId}");
                 }
             }
             else
             {
-                if ($serverId)
-                {
-                    $server = $api->server($serverId);
+                $servers = $this->api->servers($hostnameOrServerId);
 
-                    if (empty($server)) {
-                        $this->fail("Could not find server {$serverId}");
-                    }
-                }
-                elseif ($hostname)
-                {
-                    $servers = $api->servers($hostname);
-
-                    if (empty($servers)) {
-                        $this->fail("No server data returned for {$hostname}");
-                    }
-
-                    $server = $servers[0];
-                }
-                else
-                {
-                    // no options specified, just show a list of backup images
-                    $this->listImages();
-
-                    return self::SUCCESS;
+                if (empty($servers)) {
+                    $this->fail("No server data returned for {$hostnameOrServerId}");
                 }
 
-                $backups = $api->backups($server);
-
-                if (empty($backups))
-                {
-                    $this->fail("No backup data returned for {$server['name']}");
-                }
-
-                $image = collect($backups)->sortBy('created_at')->last();
-                $imageId = $image['id'];
-
-                $link = $api->link($imageId);
-
-                if (empty($link))
-                {
-                    $this->fail("No download link found for image {$imageId}");
-                }
+                $server = $servers[0];
             }
 
-            $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->format("Ymd-His");
-            $storagePath = $this->getStoragePath($server);
-            $filePath = "{$storagePath}/backup-{$date}-{$imageId}.zst";
+            $backups = $this->api->backups($server);
 
-            $path = Storage::path($filePath);
-
-            if (Storage::exists($filePath) && !$this->option('force'))
+            if (empty($backups))
             {
-                $this->line("Backup file [{$filePath}] already exists, use the --force flag to over-ride");
-                return self::SUCCESS;
+                $this->fail("No backup data returned for {$server['name']}");
             }
 
-            $start = now();
+            $image = collect($backups)->sortBy('created_at')->last();
+            $imageId = $image['id'];
 
-            $this->download($link['disks'][0]['compressed_url'], $path);
+            $link = $this->api->link($imageId);
 
-            $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
-            $this->line("Completed download for {$server['name']} in {$timeFormatted} seconds");
-            $this->newLine();
-
-            if (!$this->testDownload($path))
+            if (empty($link))
             {
-                Storage::delete($filePath);
-                return self::FAILURE;
+                $this->fail("No download link found for image {$imageId}");
             }
+        }
 
-            $size = Storage::size($filePath);
-            $sizeGb = $size / (1024 * 1024 * 1024);
-            $expectedSize = $image['size_gigabytes'];
+        $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->format("Ymd-His");
+        $storagePath = $this->getStoragePath($server);
+        $filePath = "{$storagePath}/backup-{$date}-{$imageId}.zst";
 
-            if ($sizeGb != $expectedSize)
-            {
-                $this->fail("Download size of {$sizeGb} GB does not match expected {$expectedSize} GB");
-            }
+        $path = Storage::path($filePath);
 
-            $sizeFormatted = Number::format($sizeGb, 2);
-
-            $this->line("Successfully downloaded {$sizeFormatted} GB to [{$filePath}]");
+        if (Storage::exists($filePath) && !$this->option('force'))
+        {
+            $this->log(
+                'notice',
+                "Backup file [{$filePath}] already exists, use the --force flag to over-ride",
+                "Backup file already exists, aborting",
+                ['path' => $filePath]
+            );
 
             return self::SUCCESS;
         }
-        catch (BinaryLaneException $e)
+
+        $start = now();
+
+        $this->download($link['disks'][0]['compressed_url'], $path);
+
+        $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
+        $this->line("Completed download for {$server['name']} in {$timeFormatted} seconds");
+        $this->newLine();
+
+        if (!$this->testDownload($path))
         {
-            $this->fail($e->getMessage());
+            Storage::delete($filePath);
+            return self::FAILURE;
         }
+
+        $size = Storage::size($filePath);
+        $sizeGb = $size / (1024 * 1024 * 1024);
+        $expectedSize = $image['size_gigabytes'];
+
+        if ($sizeGb != $expectedSize)
+        {
+            $this->fail("Download size of {$sizeGb} GB does not match expected {$expectedSize} GB");
+        }
+
+        $sizeFormatted = Number::format($sizeGb, 2);
+
+        $this->line("Successfully downloaded {$sizeFormatted} GB to [{$filePath}]");
+
+        return self::SUCCESS;
     }
 
     protected function listImages()
@@ -198,8 +193,12 @@ class Download extends Command
 
     protected function download(string $url, string $path) : void
     {
-        $this->line("Downloading [{$url}] to [{$path}]");
-        Log::info("Downloading image", compact('url', 'path'));
+        $this->log(
+            'notice',
+            "Downloading [{$url}] to [{$path}]",
+            "Downloading image",
+            compact('url', 'path')
+        );
 
         $progress = new ProgressBar($this->output, 100);
         $progress->start();
@@ -224,6 +223,7 @@ class Download extends Command
 
         if (!Storage::exists($storagePath))
         {
+            Log::notice("Storage path doesn't exist, creating", ['path' => $storagePath]);
             Storage::makeDirectory($storagePath);
         }
 
@@ -235,14 +235,25 @@ class Download extends Command
         $binary = config('binarylane.zstd_binary');
         $cmd = "{$binary} --test {$path}";
 
-        $this->line("Testing download [{$path}]");
-        Log::debug("Testing download", compact('cmd'));
+        $this->log(
+            'notice',
+            "Testing download [{$path}]",
+            "Testing download",
+            compact('path')
+        );
 
         $result = Process::forever()->path(storage_path())->run($cmd);
 
         if ($result->failed())
         {
-            $this->line("Downloaded file failed zstd test: " . $result->errorOutput());
+            $output = $result->errorOutput();
+
+            $this->log(
+                'error',
+                "Downloaded file failed zstd test: " . $output,
+                "Downloaded file failed zstd test",
+                compact('path', 'output')
+            );
         }
 
         return $result->successful();

@@ -2,13 +2,10 @@
 
 namespace App\Commands;
 
-use App\Api;
-use App\Exceptions\BinaryLaneException;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Str;
-use LaravelZero\Framework\Commands\Command;
 
-class Servers extends Command
+class Servers extends BaseCommand
 {
     /**
      * The name and signature of the console command.
@@ -29,60 +26,57 @@ class Servers extends Command
     /**
      * Execute the console command.
      */
-    public function handle(Api $api)
+    public function handle()
     {
         $hostname = $this->argument('hostname');
         $hostnameOutput = $hostname ? " for {$hostname}" : '';
 
-        try
+        if (is_numeric($hostname))
         {
-            if (is_numeric($hostname))
-            {
-                // $hostname is server_id
-                $server = $api->server($hostname);
+            // $hostname is server_id
+            $server = $this->api->server($hostname);
 
-                $servers[] = $server;
-            }
-            else
-            {
-                $servers = $api->servers($hostname);
-            }
-
-            if (empty($servers))
-            {
-                $this->fail("No server data returned{$hostnameOutput}");
-            }
-
-            if ($this->option('id'))
-            {
-                collect($servers)->each(function ($server) {
-                    $this->line($server['id']);
-                });
-            }
-            else
-            {
-                $table = collect($servers)->sortBy('id')->map(function ($server) {
-                    return [
-                        'id' => $server['id'],
-                        'name' => $server['name'],
-                        'memory' => Str::padLeft($server['memory'], 6),
-                        'vcpus' => Str::padLeft($server['vcpus'], 5),
-                        'disk' => Str::padLeft($server['disk'], 4),
-                    ];
-                });
-
-                $this->table(
-                    ['ID', 'Name', 'Memory', 'VCPUs', 'Disk'],
-                    $table
-                );
-            }
-
-            return self::SUCCESS;
+            $servers[] = $server;
         }
-        catch (BinaryLaneException $e)
+        else
         {
-            $this->fail($e->getMessage());
+            $servers = $this->api->servers($hostname);
         }
+
+        if (empty($servers))
+        {
+            $this->fail("No server data returned{$hostnameOutput}");
+        }
+
+        if ($this->option('id'))
+        {
+            collect($servers)->each(function ($server) {
+                $this->line($server['id']);
+            });
+        }
+        else
+        {
+            $this->newLine();
+            $this->line("Servers");
+            $this->newLine();
+
+            $table = collect($servers)->sortBy('id')->map(function ($server) {
+                return [
+                    'id' => $server['id'],
+                    'name' => $server['name'],
+                    'memory' => Str::padLeft($server['memory'], 6),
+                    'vcpus' => Str::padLeft($server['vcpus'], 5),
+                    'disk' => Str::padLeft($server['disk'], 4),
+                ];
+            });
+
+            $this->table(
+                ['ID', 'Name', 'Memory', 'VCPUs', 'Disk'],
+                $table
+            );
+        }
+
+        return self::SUCCESS;
     }
 
     /**

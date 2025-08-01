@@ -3,11 +3,14 @@
 use App\Exceptions\BinaryLaneException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class Api
 {
     public function account() : array
     {
+        Log::debug('api::account');
+
         try
         {
             return Http::binarylane()
@@ -21,13 +24,15 @@ class Api
         }
     }
 
-    public function server(int $serverId) : array
+    public function server(int $server_id) : array
     {
+        Log::debug('api::account', compact(['server_id']));
+
         try
         {
             return Http::binarylane()
                 ->withUrlParameters([
-                    'server_id' => $serverId,
+                    'server_id' => $server_id,
                 ])
                 ->get('servers/{server_id}')
                 ->throw()
@@ -35,12 +40,14 @@ class Api
         }
         catch (RequestException $e)
         {
-            throw new BinaryLaneException("Could not fetch server information {$serverId}", $e->response, $e);
+            throw new BinaryLaneException("Could not fetch server information {$server_id}", $e->response, $e);
         }
     }
 
     public function servers(string $hostname = null) : array
     {
+        Log::debug('api::servers', compact(['hostname']));
+
         try
         {
             return Http::binarylane()
@@ -56,6 +63,8 @@ class Api
 
     public function createBackup(array $server) : array
     {
+        Log::debug('api::createBackup', $this->serverContext($server));
+
         try
         {
             return Http::binarylane()
@@ -77,13 +86,15 @@ class Api
         }
     }
 
-    public function action(int $actionId) : array
+    public function action(int $action_id) : array
     {
+        Log::debug('api::action', compact(['action_id']));
+
         try
         {
             return Http::binarylane()
                 ->withUrlParameters([
-                    'actionid' => $actionId,
+                    'actionid' => $action_id,
                 ])
                 ->get('actions/{actionid}')
                 ->throw()
@@ -91,12 +102,14 @@ class Api
         }
         catch (RequestException $e)
         {
-            throw new BinaryLaneException("Could not fetch backup status {$actionId}", $e->response, $e);
+            throw new BinaryLaneException("Could not fetch backup status {$action_id}", $e->response, $e);
         }
     }
 
     public function backups(array $server) : array
     {
+        Log::debug('api::backups', $this->serverContext($server));
+
         try
         {
             return Http::binarylane()
@@ -115,6 +128,8 @@ class Api
 
     public function images() : array
     {
+        Log::debug('api::images');
+
         try
         {
             return Http::binarylane()
@@ -128,13 +143,15 @@ class Api
         }
     }
 
-    public function image(int $imageId) : array
+    public function image(int $image_id) : array
     {
+        Log::debug('api::image', compact(['image_id']));
+
         try
         {
             return Http::binarylane()
                 ->withUrlParameters([
-                    'image_id' => $imageId,
+                    'image_id' => $image_id,
                 ])
                 ->get('images/{image_id}')
                 ->throw()
@@ -142,17 +159,19 @@ class Api
         }
         catch (RequestException $e)
         {
-            throw new BinaryLaneException("Could not fetch image {$imageId}", $e->response, $e);
+            throw new BinaryLaneException("Could not fetch image {$image_id}", $e->response, $e);
         }
     }
 
-    public function link(int $imageId) : array
+    public function link(int $image_id) : array
     {
+        Log::debug('api::link', compact(['image_id']));
+
         try
         {
             return Http::binarylane()
                 ->withUrlParameters([
-                    'image_id' => $imageId,
+                    'image_id' => $image_id,
                 ])
                 ->get('images/{image_id}/download')
                 ->throw()
@@ -160,12 +179,14 @@ class Api
         }
         catch (RequestException $e)
         {
-            throw new BinaryLaneException("Could not fetch links for image {$imageId}", $e->response, $e);
+            throw new BinaryLaneException("Could not fetch links for image {$image_id}", $e->response, $e);
         }
     }
 
     public function download(string $url, string $path, callable $progress)
     {
+        Log::debug('api::download', compact(['url', 'path']));
+
         try
         {
             return Http::sink($path)
@@ -180,5 +201,12 @@ class Api
         }
     }
 
-
+    protected function serverContext(array $server) : array
+    {
+        return [
+            'server_id' => $server['id'],
+            'name' => $server['name'],
+            'disk' => $server['disk'],
+        ];
+    }
 }
