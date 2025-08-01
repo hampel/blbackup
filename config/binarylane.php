@@ -10,4 +10,24 @@ return [
 
     'api_token' => env('BINARYLANE_API_TOKEN'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Timeout
+    |--------------------------------------------------------------------------
+    |
+    | Maximum time in seconds to wait for downloads to complete
+    */
+
+    'timeout' => env('TIMEOUT', 3600),
+
+    /*
+    |--------------------------------------------------------------------------
+    | ZSTD Path
+    |--------------------------------------------------------------------------
+    |
+    | Path to zstd executable for testing downloads
+    */
+
+    'zstd_binary' => env('ZSTD_BINARY', '/usr/bin/zstd'),
+
 ];

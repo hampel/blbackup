@@ -4,27 +4,29 @@ namespace App\Commands;
 
 use App\Api;
 use App\Exceptions\BinaryLaneException;
+use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
 
-class Servers extends Command
+class Backups extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'servers
-                            {hostname? : hostname or numeric server id to list data for}
-                            {--i|id : just list server IDs}';
+    protected $signature = 'backups
+                            {hostname : hostname or numeric server id to list backups for}
+                            {--i|id : just list backup IDs}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'List server info';
+    protected $description = 'List backups for a server';
 
     /**
      * Execute the console command.
@@ -32,7 +34,6 @@ class Servers extends Command
     public function handle(Api $api)
     {
         $hostname = $this->argument('hostname');
-        $hostnameOutput = $hostname ? " for {$hostname}" : '';
 
         try
         {
@@ -40,39 +41,49 @@ class Servers extends Command
             {
                 // $hostname is server_id
                 $server = $api->server($hostname);
-
-                $servers[] = $server;
             }
             else
             {
                 $servers = $api->servers($hostname);
+
+                if (empty($servers))
+                {
+                    $this->fail("No server data returned for {$hostname}");
+                }
+
+                $server = $servers[0];
             }
 
-            if (empty($servers))
+            $backups = $api->backups($server);
+
+            if (empty($backups))
             {
-                $this->fail("No server data returned{$hostnameOutput}");
+                $this->fail("No backup data returned for {$hostname}");
             }
 
             if ($this->option('id'))
             {
-                collect($servers)->each(function ($server) {
-                    $this->line($server['id']);
+                collect($backups)->each(function ($backup) {
+                    $this->line($backup['id']);
                 });
             }
             else
             {
-                $table = collect($servers)->sortBy('id')->map(function ($server) {
+                $this->newLine();
+                $this->line("Backups for {$server['name']} ({$server['id']}):");
+                $this->newLine();
+
+                $table = collect($backups)->sortBy('id')->map(function ($backup) {
                     return [
-                        'id' => $server['id'],
-                        'name' => $server['name'],
-                        'memory' => Str::padLeft($server['memory'], 6),
-                        'vcpus' => Str::padLeft($server['vcpus'], 5),
-                        'disk' => Str::padLeft($server['disk'], 4),
+                        'backup_id' => Str::padLeft($backup['id'], 9),
+                        'full_name' => $backup['full_name'],
+                        'created_at' => Carbon::createFromFormat("Y-m-d\TH:i:sT", $backup['created_at'])->toDateTimeString(),
+                        'size' => Str::padLeft(Number::format($backup['size_gigabytes'], 2), 7),
                     ];
                 });
 
                 $this->table(
-                    ['ID', 'Name', 'Memory', 'VCPUs', 'Disk'],
+                    ['Backup ID', 'Backup Name', 'Date Created', 'Size GB'],
                     $table
                 );
             }

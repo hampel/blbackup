@@ -2,7 +2,6 @@
 
 use App\Exceptions\BinaryLaneException;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class Api
@@ -22,6 +21,24 @@ class Api
         }
     }
 
+    public function server(int $serverId) : array
+    {
+        try
+        {
+            return Http::binarylane()
+                ->withUrlParameters([
+                    'server_id' => $serverId,
+                ])
+                ->get('servers/{server_id}')
+                ->throw()
+                ->json('server');
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not fetch server information {$serverId}", $e->response, $e);
+        }
+    }
+
     public function servers(string $hostname = null) : array
     {
         try
@@ -33,11 +50,11 @@ class Api
         }
         catch (RequestException $e)
         {
-            throw new BinaryLaneException("Could not fetch server information", $e->response, $e);
+            throw new BinaryLaneException("Could not fetch server information for {$hostname}", $e->response, $e);
         }
     }
 
-    public function backup(array $server) : array
+    public function createBackup(array $server) : array
     {
         try
         {
@@ -77,4 +94,91 @@ class Api
             throw new BinaryLaneException("Could not fetch backup status {$actionId}", $e->response, $e);
         }
     }
+
+    public function backups(array $server) : array
+    {
+        try
+        {
+            return Http::binarylane()
+                ->withUrlParameters([
+                    'server_id' => $server['id'],
+                ])
+                ->get('servers/{server_id}/backups')
+                ->throw()
+                ->json('backups');
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not fetch list of backups for server {$server['name']}", $e->response, $e);
+        }
+    }
+
+    public function images() : array
+    {
+        try
+        {
+            return Http::binarylane()
+                ->get('images')
+                ->throw()
+                ->json('images');
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not fetch list of images", $e->response, $e);
+        }
+    }
+
+    public function image(int $imageId) : array
+    {
+        try
+        {
+            return Http::binarylane()
+                ->withUrlParameters([
+                    'image_id' => $imageId,
+                ])
+                ->get('images/{image_id}')
+                ->throw()
+                ->json('image');
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not fetch image {$imageId}", $e->response, $e);
+        }
+    }
+
+    public function link(int $imageId) : array
+    {
+        try
+        {
+            return Http::binarylane()
+                ->withUrlParameters([
+                    'image_id' => $imageId,
+                ])
+                ->get('images/{image_id}/download')
+                ->throw()
+                ->json('link');
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not fetch links for image {$imageId}", $e->response, $e);
+        }
+    }
+
+    public function download(string $url, string $path, callable $progress)
+    {
+        try
+        {
+            return Http::sink($path)
+                ->withOptions(['progress' => $progress])
+                ->timeout(config('binarylane.timeout'))
+                ->get($url)
+                ->throw();
+        }
+        catch (RequestException $e)
+        {
+            throw new BinaryLaneException("Could not download image [{$url}]", $e->response, $e);
+        }
+    }
+
+
 }
