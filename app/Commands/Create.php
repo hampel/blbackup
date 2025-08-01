@@ -83,7 +83,7 @@ class Create extends BaseCommand
 
             if ($this->backup($server) && $this->option('download'))
             {
-                $this->call('download', ['--server' => $server['id']]);
+                $this->call('download', ['server' => $server['id']]);
             }
 
         });
