@@ -5,7 +5,7 @@ return [
     'disks' => [
         'local' => [
             'driver' => 'local',
-            'root' => env('BACKUP_DIR'),
+            'root' => storage_path(),
         ],
     ],
 ];
