@@ -160,6 +160,8 @@ class Download extends BaseCommand
 
         $this->line("Successfully downloaded {$sizeFormatted} GB to [{$filePath}]");
 
+        // TODO: implement optional file moving post-download (rclone?)
+
         return self::SUCCESS;
     }
 
