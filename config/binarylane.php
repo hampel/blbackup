@@ -39,4 +39,27 @@ return [
     */
 
     'keeponly_days' => env('KEEPONLY_DAYS', 7),
+
+    /*
+    |--------------------------------------------------------------------------
+    | rclone settings
+    |--------------------------------------------------------------------------
+    |
+    | Move backup files to secondary storage after downloading
+    | Requires rclone to be installed
+    */
+
+    'rclone' => [
+        /**
+         * Path to rclone binary for transferring files to secondary storage
+         */
+        'binary' => env('RCLONE_BINARY', '/usr/bin/rclone'),
+
+        /**
+         * rclone remote for secondary storage ("remote:path_prefix")
+         */
+        'remote' => env('RCLONE_REMOTE'),
+    ],
+
+
 ];

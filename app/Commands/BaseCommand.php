@@ -102,4 +102,13 @@ abstract class BaseCommand extends Command
         $this->line(str_repeat('-', strlen($string)), 'section', $verbosity);
         $this->output->newLine();
     }
+
+    protected function getVerbosity() : string
+    {
+        return match (true) {
+            $this->output->isVerbose() => ' --verbose',
+            $this->output->isQuiet() => ' --quiet',
+            default => '',
+        };
+    }
 }
