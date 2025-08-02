@@ -30,4 +30,13 @@ return [
 
     'zstd_binary' => env('ZSTD_BINARY', '/usr/bin/zstd'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Keeponly days
+    |--------------------------------------------------------------------------
+    |
+    | Number of days to keep local backups. Backups older than this will be removed by the clean command
+    */
+
+    'keeponly_days' => env('KEEPONLY_DAYS', 7),
 ];
