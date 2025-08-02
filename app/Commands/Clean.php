@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 class Clean extends BaseCommand
@@ -13,7 +14,8 @@ class Clean extends BaseCommand
      *
      * @var string
      */
-    protected $signature = 'clean';
+    protected $signature = 'clean
+                            {--d|dry-run : Don\'t delete any files, just list what would be deleted}';
 
     /**
      * The console command description.
@@ -29,30 +31,62 @@ class Clean extends BaseCommand
      */
     public function handle()
     {
-        $path = Storage::path('backups');
         $keeponly = config('binarylane.keeponly_days');
-        $cutoff = Carbon::now()->subDays($keeponly)->timestamp;
+        $path = Storage::disk('downloads')->path('');
 
         $this->log(
-            'info',
+            'notice',
             "Cleaning up old backups from [{$path}] older than {$keeponly} days",
             "Cleaning up old backups",
             compact('path', 'keeponly')
         );
 
-        collect(Storage::allFiles('backups'))
+        if ($this->option('dry-run'))
+        {
+            $this->line("Dry-run only");
+        }
+        else
+        {
+            if (!$this->option('no-interaction') && !$this->confirm("This operation cannot be undone. Continue ?")) {
+                $this->line("Operation aborted by user");
+                return self::SUCCESS;
+            }
+        }
+
+        $cutoff = Carbon::now()->subDays($keeponly)->timestamp;
+
+        collect(Storage::disk('downloads')->allFiles(''))
             ->reject(function ($path) use ($cutoff) {
-                return Storage::lastModified($path) > $cutoff;
+                return Storage::disk('downloads')->lastModified($path) > $cutoff;
+            })
+            ->tap(function (Collection $collection) {
+                if ($collection->count() === 0)
+                {
+                    $this->line("Nothing to delete");
+                }
+                elseif ($this->option('dry-run'))
+                {
+                    $this->line("The following files would be deleted:");
+                }
             })
             ->each(function ($path) {
-                $this->log(
-                    'info',
-                    "Deleting old backup file [{$path}]",
-                    "Deleting old backup file",
-                    compact('path')
-                );
 
-                Storage::delete($path);
+                if ($this->option('dry-run'))
+                {
+                    $this->line($path);
+                }
+                else
+                {
+                    $this->log(
+                        'notice',
+                        "Deleting old backup file [{$path}]",
+                        "Deleting old backup file",
+                        compact('path')
+                    );
+
+                    Storage::disk('downloads')->delete($path);
+                }
+
             });
 
         return self::SUCCESS;

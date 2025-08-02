@@ -119,9 +119,9 @@ class Download extends BaseCommand
         $storagePath = $this->getStoragePath($server);
         $filePath = "{$storagePath}/backup-{$date}-{$imageId}.zst";
 
-        $path = Storage::path($filePath);
+        $path = Storage::disk('downloads')->path($filePath);
 
-        if (Storage::exists($filePath) && !$this->option('force'))
+        if (Storage::disk('downloads')->exists($filePath) && !$this->option('force'))
         {
             $this->log(
                 'notice',
@@ -143,11 +143,11 @@ class Download extends BaseCommand
 
         if (!$this->testDownload($path))
         {
-            Storage::delete($filePath);
+            Storage::disk('downloads')->delete($filePath);
             return self::FAILURE;
         }
 
-        $size = Storage::size($filePath);
+        $size = Storage::disk('downloads')->size($filePath);
         $sizeGb = $size / (1024 * 1024 * 1024);
         $expectedSize = $image['size_gigabytes'];
 
@@ -223,12 +223,12 @@ class Download extends BaseCommand
 
     protected function getStoragePath(array $server) : string
     {
-        $storagePath = "backups/{$server['name']}";
+        $storagePath = "{$server['name']}";
 
-        if (!Storage::exists($storagePath))
+        if (!Storage::disk('downloads')->exists($storagePath))
         {
             Log::notice("Storage path doesn't exist, creating", ['path' => $storagePath]);
-            Storage::makeDirectory($storagePath);
+            Storage::disk('downloads')->makeDirectory($storagePath);
         }
 
         return $storagePath;
