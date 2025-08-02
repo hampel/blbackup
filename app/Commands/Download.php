@@ -21,7 +21,8 @@ class Download extends BaseCommand
     protected $signature = 'download
                             {server? : download most recent backup for specified hostname or numeric server id}
                             {--i|id= : download specific backup image id}
-                            {--f|force : force re-download of existing backup}';
+                            {--f|force : force re-download of existing backup}
+                            {--no-test : skip testing of downloaded files}';
 
     /**
      * The console command description.
@@ -141,7 +142,7 @@ class Download extends BaseCommand
         $this->line("Completed download for {$server['name']} in {$timeFormatted} seconds");
         $this->newLine();
 
-        if (!$this->testDownload($path))
+        if (!$this->option('no-test') && !$this->testDownload($path))
         {
             Storage::disk('downloads')->delete($filePath);
             return self::FAILURE;
@@ -237,13 +238,15 @@ class Download extends BaseCommand
     protected function testDownload(string $path) : bool
     {
         $binary = config('binarylane.zstd_binary');
+
+        // TODO: add verbosity?
         $cmd = "{$binary} --test {$path}";
 
         $this->log(
             'notice',
             "Testing download [{$path}]",
             "Testing download",
-            compact('path')
+            compact('cmd')
         );
 
         $result = Process::forever()->path(storage_path())->run($cmd);
