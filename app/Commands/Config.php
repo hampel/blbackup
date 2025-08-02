@@ -3,7 +3,6 @@
 namespace App\Commands;
 
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use LaravelZero\Framework\Commands\Command;
 
@@ -48,11 +47,15 @@ class Config extends Command
         static::addToSection('BinaryLane', fn () => [
             'Timeout' => config('binarylane.timeout'),
             'ZSTD Binary' => config('binarylane.zstd_binary'),
+            'Keep Only Days' => config('binarylane.keeponly_days'),
+            'Rclone Binary' => config('binarylane.rclone.binary'),
+            'Rclone Remote' => config('binarylane.rclone.remote'),
         ]);
 
         static::addToSection('Filesystems', fn () => [
             'Default' => config('filesystems.default'),
             'Storage Path' => storage_path(),
+            'Downloads Disk' => config('filesystems.disks.downloads.root'),
         ]);
 
         static::addToSection('Logging', fn () => [
@@ -60,6 +63,11 @@ class Config extends Command
             'Stack Channels' => implode(',', config('logging.channels.stack.channels')),
             'Single Path' => config('logging.channels.single.path'),
             'Single Level' => config('logging.channels.single.level'),
+            'Daily Path' => config('logging.channels.daily.path'),
+            'Daily Level' => config('logging.channels.daily.level'),
+            'Daily Days' => config('logging.channels.daily.days'),
+            'Slack URL' => config('logging.channels.slack.url'),
+            'Slack Level' => config('logging.channels.slack.level'),
         ]);
 
         collect(static::$data)
