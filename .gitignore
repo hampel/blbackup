@@ -6,3 +6,4 @@
 .env
 _ide_helper.php
 storage/
+.box_dump/
