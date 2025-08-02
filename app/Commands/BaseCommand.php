@@ -2,7 +2,6 @@
 
 use App\Api;
 use App\Exceptions\BinaryLaneException;
-use Illuminate\Console\ManuallyFailedException;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;

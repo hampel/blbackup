@@ -24,7 +24,7 @@ class Backups extends BaseCommand
      */
     protected $description = 'List backups for a server';
 
-    protected string $commandContext = 'Backups';
+    protected string $commandContext = 'backups';
 
     /**
      * Execute the console command.

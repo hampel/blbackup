@@ -23,6 +23,8 @@ class Servers extends BaseCommand
      */
     protected $description = 'List server info';
 
+    protected string $commandContext = 'servers';
+
     /**
      * Execute the console command.
      */

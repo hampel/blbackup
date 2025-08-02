@@ -20,7 +20,7 @@ class Account extends BaseCommand
      */
     protected $description = 'Show BinaryLane account information';
 
-    protected string $commandContext = 'Account';
+    protected string $commandContext = 'account';
 
     /**
      * Execute the console command.

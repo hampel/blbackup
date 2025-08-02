@@ -30,6 +30,8 @@ class Download extends BaseCommand
      */
     protected $description = 'Download backups to local storage';
 
+    protected string $commandContext = 'download';
+
     /**
      * Execute the console command.
      */

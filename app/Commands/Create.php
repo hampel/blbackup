@@ -25,7 +25,7 @@ class Create extends BaseCommand
      *
      * @var string
      */
-    protected $description = 'Create new server backup';
+    protected $description = 'create';
 
     protected string $commandContext = 'Create Backup';
 
