@@ -97,9 +97,9 @@ class Create extends BaseCommand
 
         $this->log(
             'notice',
-            "Backing up {$server['disk']}GB from {$server['name']}",
+            "Backing up {$server['disk']}GB from {$server['name']} to temporary backup image",
             "Backing up server",
-            ['server_id' => $server['id'], 'disk' => $server['disk'], 'name' => $server['name']]
+            ['server_id' => $server['id'], 'disk_size' => $server['disk'], 'name' => $server['name']]
         );
 
         $start = now();
@@ -161,7 +161,7 @@ class Create extends BaseCommand
                 'notice',
                 "Completed server backup {$server['name']} in {$timeFormatted} seconds",
                 "Completed server backup",
-                ['time_seconds' => $timeFormatted, 'server_id' => $server['id'], 'disk' => $server['disk'], 'name' => $server['name']]
+                ['time_seconds' => $timeFormatted, 'server_id' => $server['id'], 'disk_size' => $server['disk'], 'name' => $server['name']]
             );
             $this->newLine();
 
@@ -173,7 +173,7 @@ class Create extends BaseCommand
                 'error',
                 "Error backing up {$server['name']} - status: {$status['status']}",
                 "Error backing up server",
-                ['status' => $status['status'], 'server_id' => $server['id'], 'disk' => $server['disk'], 'name' => $server['name']]
+                ['status' => $status['status'], 'server_id' => $server['id'], 'disk_size' => $server['disk'], 'name' => $server['name']]
             );
 
             return false;
