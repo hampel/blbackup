@@ -26,9 +26,9 @@ class Create extends BaseCommand
      *
      * @var string
      */
-    protected $description = 'create';
+    protected $description = 'Create new temporary backup on BinaryLane and optionally download locally';
 
-    protected string $commandContext = 'Create Backup';
+    protected string $commandContext = 'create';
 
     /**
      * Execute the console command.
@@ -133,6 +133,7 @@ class Create extends BaseCommand
             if ($start->diffInSeconds(now()) > $timeout) {
                 // we've been running too long, stop
 
+                $this->newLine();
                 $this->log(
                     'warning',
                     "Backup of {$server['name']} exceeded timeout of {$timeout} seconds",
