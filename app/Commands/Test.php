@@ -55,8 +55,8 @@ class Test extends Command
         }
         elseif ($url = $this->option('download'))
         {
-            $storage = Storage::path('');
-            $path = tempnam($storage, 'download');
+            $storage = Storage::disk('downloads')->path('');
+            $path = tempnam($storage, 'download-test-');
 
             $this->line("Downloading [{$url}] to [{$path}]");
 
