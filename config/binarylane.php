@@ -18,7 +18,7 @@ return [
     | Maximum time in seconds to wait for downloads to complete
     */
 
-    'timeout' => env('TIMEOUT', 3600),
+    'timeout' => env('DOWNLOAD_TIMEOUT', 3600),
 
     /*
     |--------------------------------------------------------------------------
