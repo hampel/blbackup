@@ -3,8 +3,13 @@
 namespace App\Commands;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 use LaravelZero\Framework\Commands\Command;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class Test extends Command
@@ -14,7 +19,9 @@ class Test extends Command
      *
      * @var string
      */
-    protected $signature = 'app:test';
+    protected $signature = 'app:test
+                            {--l|logs : generate test logs of varying log levels}
+                            {--d|download= : test download of the specified URL}';
 
     /**
      * The console command description.
@@ -28,20 +35,63 @@ class Test extends Command
      */
     public function handle()
     {
-        $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
-        foreach ($levels as $level)
+        if ($this->option('logs'))
         {
-            $this->log($level, "This is a test log message");
+            $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+            foreach ($levels as $level)
+            {
+                $this->log($level, "This is a test log message");
+            }
+
+            $this->line("Log messages written - please check your logs");
+            $this->info("Logging configuration");
+            $this->info("---------------------");
+
+            $logging = collect(config('logging'))->dot();
+            foreach ($logging as $key => $value)
+            {
+                $this->line("$key: $value");
+            }
         }
-
-        $this->line("Log messages written - please check your logs");
-        $this->info("Logging configuration");
-        $this->info("---------------------");
-
-        $logging = collect(config('logging'))->dot();
-        foreach ($logging as $key => $value)
+        elseif ($url = $this->option('download'))
         {
-            $this->line("$key: $value");
+            $storage = Storage::path('');
+            $path = tempnam($storage, 'download');
+
+            $this->line("Downloading [{$url}] to [{$path}]");
+
+            $start = now();
+
+            $progress = new ProgressBar($this->output, 100);
+            $progress->start();
+
+            $result = Http::sink($path)
+                ->withOptions(['progress' => function ($downloadTotal, $downloadedBytes, $uploadTotal, $uploadedBytes) use ($progress) {
+                    if ($downloadTotal > 0)
+                    {
+                        $progress->setProgress(intval(round(($downloadedBytes / $downloadTotal) * 100)));
+                    }
+                }])
+                ->timeout(3600)
+                ->get($url);
+
+            $progress->finish();
+
+            if ($result->successful())
+            {
+                $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
+                $this->newLine();
+                $this->line("Completed download in {$timeFormatted} seconds");
+                $this->newLine();
+            }
+            else
+            {
+                $this->fail($result->reason());
+            }
+        }
+        else
+        {
+            $this->line("Please specify a test type: --logs | --download");
         }
 
         return Command::SUCCESS;
