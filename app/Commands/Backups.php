@@ -15,7 +15,8 @@ class Backups extends BaseCommand
      */
     protected $signature = 'backups
                             {server? : hostname or numeric server id to list backups for}
-                            {--i|id : just list backup IDs}';
+                            {--i|id : just list backup IDs}
+                            {--u|urls : also list download URLs}';
 
     /**
      * The console command description.
@@ -74,7 +75,15 @@ class Backups extends BaseCommand
             $this->line("Backups for {$server['name']} ({$server['id']}):");
             $this->newLine();
 
-            $table = collect($backups)->sortBy('id')->map(function ($backup) {
+            $links = [];
+
+            $table = collect($backups)->sortBy('id')->map(function ($backup) use (&$links) {
+
+                if ($this->option('urls'))
+                {
+                    $links[$backup['id']] = $this->api->link($backup['id']);
+                }
+
                 return [
                     'backup_id' => Str::padLeft($backup['id'], 9),
                     'full_name' => $backup['full_name'],
@@ -87,6 +96,19 @@ class Backups extends BaseCommand
                 ['Backup ID', 'Backup Name', 'Date Created', 'Size GB'],
                 $table
             );
+
+            if ($this->option('urls'))
+            {
+                $this->newLine();
+                $this->line("Backup download URLs");
+                $this->newLine();
+
+                collect($links)->each(function ($link) {
+                    $this->line("Backup ID: {$link['id']}");
+                    $this->line($link['disks'][0]['compressed_url']);
+                    $this->newLine();
+                });
+            }
         }
 
         return self::SUCCESS;
