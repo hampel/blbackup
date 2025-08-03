@@ -45,7 +45,7 @@ class Config extends Command
         ]);
 
         static::addToSection('BinaryLane', fn () => [
-            'Timeout' => config('binarylane.timeout'),
+            'API Timeout' => config('binarylane.timeout'),
             'ZSTD Binary' => config('binarylane.zstd_binary'),
             'Keep Only Days' => config('binarylane.keeponly_days'),
             'Rclone Binary' => config('binarylane.rclone.binary'),
