@@ -18,7 +18,8 @@ class Create extends BaseCommand
     protected $signature = 'create
                             {server? : hostname or numeric server id to create backups for}
                             {--a|all : create backups for all servers in account}
-                            {--d|download : also download each backup created}';
+                            {--d|download : also download each backup created}
+                            {--m|move : move downloaded files to secondary storage}';
 
     /**
      * The console command description.
@@ -83,7 +84,7 @@ class Create extends BaseCommand
 
             if ($this->backup($server) && $this->option('download'))
             {
-                $this->call('download', ['server' => $server['id']]);
+                $this->call('download', ['server' => $server['id'], '--move' => $this->option('move')]);
             }
 
         });

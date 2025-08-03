@@ -22,7 +22,8 @@ class Download extends BaseCommand
                             {server? : download most recent backup for specified hostname or numeric server id}
                             {--i|id= : download specific backup image id}
                             {--f|force : force re-download of existing backup}
-                            {--no-test : skip testing of downloaded files}';
+                            {--no-test : skip testing of downloaded files}
+                            {--m|move : move files to secondary storage after downloading}';
 
     /**
      * The console command description.
@@ -161,7 +162,10 @@ class Download extends BaseCommand
 
         $this->line("Successfully downloaded {$sizeFormatted} GB to [{$filePath}]");
 
-        // TODO: implement optional file moving post-download (rclone?)
+        if ($this->option('move'))
+        {
+            return $this->call('move', ['file' => $filePath]);
+        }
 
         return self::SUCCESS;
     }
