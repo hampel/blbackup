@@ -36,7 +36,21 @@ class Backups extends BaseCommand
 
         if (empty($hostnameOrServerId))
         {
-            $this->fail("No hostname specified");
+            $images = $this->api->images();
+
+            if (empty($images))
+            {
+                $this->fail("No image data returned");
+            }
+
+            $this->newLine();
+            $this->line("All backup images");
+            $this->newLine();
+
+            // no options specified, just show a list of backup images
+            $this->listImages($images);
+
+            return self::SUCCESS;
         }
 
         if (is_numeric($hostnameOrServerId))
@@ -75,42 +89,58 @@ class Backups extends BaseCommand
             $this->line("Backups for {$server['name']} ({$server['id']}):");
             $this->newLine();
 
-            $links = [];
-
-            $table = collect($backups)->sortBy('id')->map(function ($backup) use (&$links) {
-
-                if ($this->option('urls'))
-                {
-                    $links[$backup['id']] = $this->api->link($backup['id']);
-                }
-
-                return [
-                    'backup_id' => Str::padLeft($backup['id'], 9),
-                    'full_name' => $backup['full_name'],
-                    'created_at' => Carbon::createFromFormat("Y-m-d\TH:i:sT", $backup['created_at'])->toDateTimeString(),
-                    'size' => Str::padLeft(Number::format($backup['size_gigabytes'], 2), 7),
-                ];
-            });
-
-            $this->table(
-                ['Backup ID', 'Backup Name', 'Date Created', 'Size GB'],
-                $table
-            );
-
-            if ($this->option('urls'))
-            {
-                $this->newLine();
-                $this->line("Backup download URLs");
-                $this->newLine();
-
-                collect($links)->each(function ($link) {
-                    $this->line("Backup ID: {$link['id']}");
-                    $this->line($link['disks'][0]['compressed_url']);
-                    $this->newLine();
-                });
-            }
+            $this->listImages($backups);
         }
 
         return self::SUCCESS;
+    }
+
+    protected function listImages(array $images)
+    {
+        $links = [];
+
+        $table = collect($images)
+            ->sortBy('id')
+            ->reject(function ($image) {
+                return $image['public'] == true || $image['type'] != 'backup';
+            })
+            ->map(function ($image) use (&$links) {
+
+                if ($this->option('urls'))
+                {
+                    $links[$image['id']] = $this->api->link($image['id']);
+                }
+
+                return [
+                    'image_id' => Str::padLeft($image['id'], 9),
+                    'full_name' => $image['full_name'],
+                    'created_at' => Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->toDateTimeString(),
+                    'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
+
+                ];
+            });
+
+        $this->table(
+            ['Backup ID', 'Backup Name', 'Created', 'Size GB'],
+            $table
+        );
+
+        if ($this->option('urls'))
+        {
+            $this->listLinks($links);
+        }
+    }
+
+    protected function listLinks(array $links)
+    {
+        $this->newLine();
+        $this->line("Backup download URLs");
+        $this->newLine();
+
+        collect($links)->each(function ($link) {
+            $this->line("Backup ID: {$link['id']}");
+            $this->line($link['disks'][0]['compressed_url']);
+            $this->newLine();
+        });
     }
 }

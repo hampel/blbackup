@@ -71,14 +71,10 @@ class Download extends BaseCommand
 
             if (empty($hostnameOrServerId))
             {
-                $this->newLine();
-                $this->line("Backup images");
-                $this->newLine();
-
                 // no options specified, just show a list of backup images
-                $this->listImages();
+                $this->call('backups');
 
-                $this->fail("No hostname, server_id or image_id specified");
+                $this->fail("Specify a hostname, server_id or backup_id to download the backup");
             }
             elseif (is_numeric($hostnameOrServerId))
             {
@@ -168,36 +164,6 @@ class Download extends BaseCommand
         }
 
         return self::SUCCESS;
-    }
-
-    protected function listImages()
-    {
-        $images = $this->api->images();
-
-        if (empty($images))
-        {
-            $this->fail("No image data returned");
-        }
-
-        $table = collect($images)
-            ->sortBy('id')
-            ->reject(function ($image) {
-                return $image['public'] == true || $image['type'] != 'backup';
-            })
-            ->map(function ($image) {
-                return [
-                    'image_id' => Str::padLeft($image['id'], 9),
-                    'full_name' => $image['full_name'],
-                    'created_at' => Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->toDateTimeString(),
-                    'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
-
-                ];
-            });
-
-        $this->table(
-            ['Image ID', 'Image Name', 'Created', 'Size GB'],
-            $table
-        );
     }
 
     protected function download(string $url, string $path) : void
