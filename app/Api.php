@@ -1,7 +1,7 @@
 <?php namespace App;
 
 use App\Exceptions\BinaryLaneException;
-use Illuminate\Http\Client\HttpClientException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -18,7 +18,7 @@ class Api
                 ->throw()
                 ->json('account');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch account information", $e->response, $e);
         }
@@ -38,7 +38,7 @@ class Api
                 ->throw()
                 ->json('server');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch server information {$server_id}", $e->response, $e);
         }
@@ -55,7 +55,7 @@ class Api
                 ->throw()
                 ->json('servers');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch server information for {$hostname}", $e->response, $e);
         }
@@ -80,7 +80,7 @@ class Api
                 ->throw()
                 ->json('action');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not initiate server backup for {$server['name']}", $e->response, $e);
         }
@@ -100,7 +100,7 @@ class Api
                 ->throw()
                 ->json('action');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch backup status {$action_id}", $e->response, $e);
         }
@@ -120,7 +120,7 @@ class Api
                 ->throw()
                 ->json('backups');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch list of backups for server {$server['name']}", $e->response, $e);
         }
@@ -137,7 +137,7 @@ class Api
                 ->throw()
                 ->json('images');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch list of images", $e->response, $e);
         }
@@ -157,7 +157,7 @@ class Api
                 ->throw()
                 ->json('image');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch image {$image_id}", $e->response, $e);
         }
@@ -177,7 +177,7 @@ class Api
                 ->throw()
                 ->json('link');
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not fetch links for image {$image_id}", $e->response, $e);
         }
@@ -195,7 +195,7 @@ class Api
                 ->get($url)
                 ->throw();
         }
-        catch (HttpClientException $e)
+        catch (RequestException $e)
         {
             throw new BinaryLaneException("Could not download image [{$url}]", $e->response, $e);
         }

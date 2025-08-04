@@ -2,6 +2,7 @@
 
 use App\Api;
 use App\Exceptions\BinaryLaneException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
@@ -27,7 +28,7 @@ abstract class BaseCommand extends Command
         {
             return parent::execute($input, $output);
         }
-        catch (BinaryLaneException $e)
+        catch (BinaryLaneException | ConnectionException $e)
         {
             Log::error($e->getMessage());
             $this->components->error($e->getMessage());
