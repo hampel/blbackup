@@ -15,8 +15,8 @@ class Backups extends BaseCommand
      */
     protected $signature = 'backups
                             {server? : hostname or numeric server id to list backups for}
-                            {--i|id : just list backup IDs}
-                            {--u|urls : also list download URLs}';
+                            {--ids : just list backup IDs}
+                            {--urls : also list download URLs}';
 
     /**
      * The console command description.
@@ -43,12 +43,25 @@ class Backups extends BaseCommand
                 $this->fail("No image data returned");
             }
 
-            $this->newLine();
-            $this->line("All backup images");
-            $this->newLine();
+            if ($this->option('ids'))
+            {
+                collect($images)->sortBy('id')
+                    ->reject(function ($image) {
+                        return $image['public'] == true || $image['type'] != 'backup';
+                    })
+                    ->each(function ($image) {
+                        $this->line($image['id']);
+                    });
+            }
+            else
+            {
+                $this->newLine();
+                $this->line("All backup images");
+                $this->newLine();
 
-            // no options specified, just show a list of backup images
-            $this->listImages($images);
+                // no options specified, just show a list of backup images
+                $this->listImages($images);
+            }
 
             return self::SUCCESS;
         }
@@ -77,7 +90,7 @@ class Backups extends BaseCommand
             $this->fail("No backup data returned for {$hostnameOrServerId}");
         }
 
-        if ($this->option('id'))
+        if ($this->option('ids'))
         {
             collect($backups)->sortBy('id')->each(function ($backup) {
                 $this->line($backup['id']);
