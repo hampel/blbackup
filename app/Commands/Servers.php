@@ -31,8 +31,6 @@ class Servers extends BaseCommand
      */
     public function handle()
     {
-        // TODO - add "servers" option to list server names to help generate include/exclude files
-
         $hostname = $this->argument('hostname');
         $hostnameOutput = $hostname ? " for {$hostname}" : '';
 
