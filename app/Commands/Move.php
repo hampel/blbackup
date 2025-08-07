@@ -16,8 +16,8 @@ class Move extends BaseCommand
      */
     protected $signature = 'move
                             {file? : file to move, relative to download path}
-                            {--a|all : move all files}
-                            {--d|dry-run : don\'t move any files, test only}';
+                            {--all : move all files}
+                            {--dry-run : don\'t move any files, test only}';
 
     /**
      * The console command description.
