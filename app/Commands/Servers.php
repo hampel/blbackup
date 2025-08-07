@@ -14,7 +14,8 @@ class Servers extends BaseCommand
      */
     protected $signature = 'servers
                             {hostname? : hostname or numeric server id to list data for}
-                            {--i|id : just list server IDs}';
+                            {--ids : just list server IDs}
+                            {--names : just list server names}';
 
     /**
      * The console command description.
@@ -30,6 +31,8 @@ class Servers extends BaseCommand
      */
     public function handle()
     {
+        // TODO - add "servers" option to list server names to help generate include/exclude files
+
         $hostname = $this->argument('hostname');
         $hostnameOutput = $hostname ? " for {$hostname}" : '';
 
@@ -50,11 +53,21 @@ class Servers extends BaseCommand
             $this->fail("No server data returned{$hostnameOutput}");
         }
 
-        if ($this->option('id'))
+        if ($this->option('ids'))
         {
-            collect($servers)->each(function ($server) {
-                $this->line($server['id']);
-            });
+            collect($servers)
+                ->sortBy('id')
+                ->each(function ($server) {
+                    $this->line($server['id']);
+                });
+        }
+        elseif ($this->option('names'))
+        {
+            collect($servers)
+                ->sortBy('name')
+                ->each(function ($server) {
+                    $this->line($server['name']);
+                });
         }
         else
         {
