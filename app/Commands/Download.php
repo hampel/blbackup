@@ -4,11 +4,11 @@ namespace App\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
-use Illuminate\Support\Str;
 use Symfony\Component\Console\Helper\ProgressBar;
 
 class Download extends BaseCommand
@@ -20,7 +20,10 @@ class Download extends BaseCommand
      */
     protected $signature = 'download
                             {server? : download most recent backup for specified hostname or numeric server id}
-                            {--i|id= : download specific backup image id}
+                            {--image= : download specific backup image id}
+                            {--all : download most recent backups for all servers in account}
+                            {--include= : include only this list of servers}
+                            {--exclude= : exclude this list of servers}
                             {--f|force : force re-download of existing backup}
                             {--no-test : skip testing of downloaded files}
                             {--m|move : move files to secondary storage after downloading}';
@@ -39,7 +42,9 @@ class Download extends BaseCommand
      */
     public function handle()
     {
-        $imageId = $this->option('id');
+        // TODO - add include/exclude options
+
+        $imageId = $this->option('image');
 
         if ($imageId)
         {
@@ -64,63 +69,129 @@ class Download extends BaseCommand
             {
                 $this->fail("Could not find server {$serverId} for image {$imageId}");
             }
+
+            return $this->downloadImage($image, $server, $link) ? self::SUCCESS : self::FAILURE;
+        }
+
+        $hostnameOrServerId = $this->argument('server');
+
+        if ($this->option('all'))
+        {
+            $servers = $this->api->servers();
+
+            if (empty($servers)) {
+                $this->fail("No server data returned for {$hostnameOrServerId}");
+            }
+        }
+        elseif (empty($hostnameOrServerId))
+        {
+            // no options specified, just show a list of backup images
+            $this->call('backups');
+
+            $this->fail("Specify a hostname, server_id or backup_id to download the backup");
+        }
+        elseif (is_numeric($hostnameOrServerId))
+        {
+            $server = $this->api->server($hostnameOrServerId);
+
+            if (empty($server)) {
+                $this->fail("Could not find server {$hostnameOrServerId}");
+            }
+
+            $servers[] = $server;
         }
         else
         {
-            $hostnameOrServerId = $this->argument('server');
+            $servers = $this->api->servers($hostnameOrServerId);
 
-            if (empty($hostnameOrServerId))
-            {
-                // no options specified, just show a list of backup images
-                $this->call('backups');
-
-                $this->fail("Specify a hostname, server_id or backup_id to download the backup");
-            }
-            elseif (is_numeric($hostnameOrServerId))
-            {
-                $server = $this->api->server($hostnameOrServerId);
-
-                if (empty($server)) {
-                    $this->fail("Could not find server {$hostnameOrServerId}");
-                }
-            }
-            else
-            {
-                $servers = $this->api->servers($hostnameOrServerId);
-
-                if (empty($servers)) {
-                    $this->fail("No server data returned for {$hostnameOrServerId}");
-                }
-
-                $server = $servers[0];
-            }
-
-            $backups = $this->api->backups($server);
-
-            if (empty($backups))
-            {
-                $this->fail("No backup data returned for {$server['name']}");
-            }
-
-            $image = collect($backups)->sortBy('created_at')->last();
-            $imageId = $image['id'];
-
-            $link = $this->api->link($imageId);
-
-            if (empty($link))
-            {
-                $this->fail("No download link found for image {$imageId}");
+            if (empty($servers)) {
+                $this->fail("No server data returned for {$hostnameOrServerId}");
             }
         }
 
+        $includeServers = null;
+        $excludeServers = null;
+
+        $include = $this->option('include');
+        if (!empty($include))
+        {
+            if (!File::exists($include))
+            {
+                $this->fail("Include file [{$include}] does not exists or is not readable");
+            }
+
+            $includeServers = array_filter(explode(PHP_EOL, File::get($include)));
+        }
+
+        $exclude = $this->option('exclude');
+        if (!empty($exclude))
+        {
+            if (!File::exists($exclude))
+            {
+                $this->fail("Exclude file [{$exclude}] does not exists or is not readable");
+            }
+
+            $excludeServers = array_filter(explode(PHP_EOL, File::get($exclude)));
+        }
+
+        collect($servers)
+            ->filter(function ($server) use ($includeServers) {
+                return $includeServers ? in_array($server['name'], $includeServers) : true;
+            })
+            ->reject(function ($server) use ($excludeServers) {
+                return $excludeServers ? in_array($server['name'], $excludeServers) : false;
+            })
+            ->each(function ($server) {
+
+                $backups = $this->api->backups($server);
+
+                if (empty($backups))
+                {
+                    $this->log(
+                        'warning',
+                        "No backup data returned for {$server['name']}",
+                        'No backup data returned',
+                        ['server' => $server['name']]
+                    );
+
+                    return;
+                }
+
+                $image = collect($backups)->sortBy('created_at')->last();
+                $imageId = $image['id'];
+
+                $link = $this->api->link($imageId);
+
+                if (empty($link))
+                {
+                    $this->log(
+                        'warning',
+                        "No download link found for image {$imageId}",
+                        'No download link found',
+                        ['image_id' => $imageId, 'server' => $server['name']]
+                    );
+
+                    return;
+                }
+
+                $this->downloadImage($image, $server, $link);
+            });
+
+        return self::SUCCESS;
+    }
+
+    protected function downloadImage(array $image, array $server, array $link) : bool
+    {
         $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->format("Ymd-His");
         $storagePath = $this->getStoragePath($server);
-        $filePath = "{$storagePath}/backup-{$date}-{$imageId}.zst";
+        $filePath = "{$storagePath}/backup-{$date}-{$image['id']}.zst";
 
         $path = Storage::disk('downloads')->path($filePath);
 
         if (Storage::disk('downloads')->exists($filePath) && !$this->option('force'))
         {
+            // TODO: check file size and if smaller than expected, resume downloading
+
             $this->log(
                 'notice',
                 "Backup file [{$filePath}] already exists, use the --force flag to over-ride",
@@ -128,7 +199,7 @@ class Download extends BaseCommand
                 ['path' => $filePath]
             );
 
-            return self::SUCCESS;
+            return false;
         }
 
         $start = now();
@@ -142,7 +213,7 @@ class Download extends BaseCommand
         if (!$this->option('no-test') && !$this->testDownload($path))
         {
             Storage::disk('downloads')->delete($filePath);
-            return self::FAILURE;
+            return false;
         }
 
         $size = Storage::disk('downloads')->size($filePath);
@@ -151,7 +222,14 @@ class Download extends BaseCommand
 
         if ($sizeGb != $expectedSize)
         {
-            $this->fail("Download size of {$sizeGb} GB does not match expected {$expectedSize} GB");
+            $this->log(
+                'error',
+                'Download size of {$sizeGb} GB does not match expected {$expectedSize} GB',
+                'Download size does not match expected',
+                compact('sizeGb', 'expectedSize')
+            );
+
+            return false;
         }
 
         $sizeFormatted = Number::format($sizeGb, 2);
@@ -163,7 +241,7 @@ class Download extends BaseCommand
             return $this->call('move', ['file' => $filePath]);
         }
 
-        return self::SUCCESS;
+        return true;
     }
 
     protected function download(string $url, string $path) : void
