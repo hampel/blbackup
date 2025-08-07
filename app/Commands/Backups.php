@@ -124,17 +124,19 @@ class Backups extends BaseCommand
                     $links[$image['id']] = $this->api->link($image['id']);
                 }
 
+                $created = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at']);
+
                 return [
                     'image_id' => Str::padLeft($image['id'], 9),
                     'full_name' => $image['full_name'],
-                    'created_at' => Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->toDateTimeString(),
+                    'created_at' => $created->toDateTimeString(),
+                    'created_at_local' => $created->timezone(config('app.timezone'))->toDateTimeString(),
                     'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
-
                 ];
             });
 
         $this->table(
-            ['Backup ID', 'Backup Name', 'Created', 'Size GB'],
+            ['Backup ID', 'Backup Name', 'Created', 'Created (local TZ)', 'Size GB'],
             $table
         );
 
