@@ -15,7 +15,7 @@ class Clean extends BaseCommand
      * @var string
      */
     protected $signature = 'clean
-                            {--d|dry-run : Don\'t delete any files, just list what would be deleted}';
+                            {--dry-run : Don\'t delete any files, just list what would be deleted}';
 
     /**
      * The console command description.
