@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
 use Illuminate\Support\Sleep;
@@ -17,7 +18,9 @@ class Create extends BaseCommand
      */
     protected $signature = 'create
                             {server? : hostname or numeric server id to create backups for}
-                            {--a|all : create backups for all servers in account}
+                            {--all : create backups for all servers in account}
+                            {--include= : include only this list of servers}
+                            {--exclude= : exclude this list of servers}
                             {--d|download : also download each backup created}
                             {--m|move : move downloaded files to secondary storage}';
 
@@ -35,6 +38,8 @@ class Create extends BaseCommand
      */
     public function handle()
     {
+        // TODO - add include/exclude options
+
         $hostnameOrServerId = $this->argument('server');
         $allServers = $this->option('all');
 
@@ -80,14 +85,46 @@ class Create extends BaseCommand
             $this->log('notice', "Backing up all servers");
         }
 
-        collect($servers)->each(function ($server) {
+        $includeServers = null;
+        $excludeServers = null;
 
-            if ($this->backup($server) && $this->option('download'))
+        $include = $this->option('include');
+        if (!empty($include))
+        {
+            if (!File::exists($include))
             {
-                $this->call('download', ['server' => $server['id'], '--move' => $this->option('move')]);
+                $this->fail("Include file [{$include}] does not exists or is not readable");
             }
 
-        });
+            $includeServers = array_filter(explode(PHP_EOL, File::get($include)));
+        }
+
+        $exclude = $this->option('exclude');
+        if (!empty($exclude))
+        {
+            if (!File::exists($exclude))
+            {
+                $this->fail("Exclude file [{$exclude}] does not exists or is not readable");
+            }
+
+            $excludeServers = array_filter(explode(PHP_EOL, File::get($exclude)));
+        }
+
+        collect($servers)
+            ->filter(function ($server) use ($includeServers) {
+                return $includeServers ? in_array($server['name'], $includeServers) : true;
+            })
+            ->reject(function ($server) use ($excludeServers) {
+                return $excludeServers ? in_array($server['name'], $excludeServers) : false;
+            })
+            ->each(function ($server) {
+
+                if ($this->backup($server) && $this->option('download'))
+                {
+                    $this->call('download', ['server' => $server['id'], '--move' => $this->option('move')]);
+                }
+
+            });
 
         return self::SUCCESS;
     }
