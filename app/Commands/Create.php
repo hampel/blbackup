@@ -38,8 +38,6 @@ class Create extends BaseCommand
      */
     public function handle()
     {
-        // TODO - add include/exclude options
-
         $hostnameOrServerId = $this->argument('server');
         $allServers = $this->option('all');
 
@@ -131,8 +129,6 @@ class Create extends BaseCommand
 
     protected function backup(array $server) : bool
     {
-        // TODO: implement exclude list
-
         $this->log(
             'notice',
             "Backing up {$server['disk']}GB from {$server['name']} to temporary backup image",

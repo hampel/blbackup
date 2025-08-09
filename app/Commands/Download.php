@@ -42,8 +42,6 @@ class Download extends BaseCommand
      */
     public function handle()
     {
-        // TODO - add include/exclude options
-
         $imageId = $this->option('image');
 
         if ($imageId)
@@ -287,7 +285,6 @@ class Download extends BaseCommand
     {
         $binary = config('binarylane.zstd_binary');
 
-        // TODO: add verbosity?
         $cmd = "{$binary} --test {$path}";
 
         $this->log(
