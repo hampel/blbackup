@@ -112,7 +112,7 @@ class Move extends BaseCommand
                 'error',
                 "Could not move file to secondary storage: " . $output,
                 "Could not move file to secondary storage",
-                compact('output')
+                compact('output', 'cmd')
             );
         }
 
