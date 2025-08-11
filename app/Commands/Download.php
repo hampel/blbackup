@@ -26,6 +26,7 @@ class Download extends BaseCommand
                             {--exclude= : exclude this list of servers}
                             {--f|force : force re-download of existing backup}
                             {--no-test : skip testing of downloaded files}
+                            {--wget : use wget to fetch files rather than internet php code}
                             {--m|move : move files to secondary storage after downloading}';
 
     /**
@@ -148,7 +149,7 @@ class Download extends BaseCommand
                     $this->log(
                         'warning',
                         "No backup data returned for {$server['name']}",
-                        'No backup data returned',
+                        "No backup data returned",
                         ['server' => $server['name']]
                     );
 
@@ -165,7 +166,7 @@ class Download extends BaseCommand
                     $this->log(
                         'warning',
                         "No download link found for image {$imageId}",
-                        'No download link found',
+                        "No download link found",
                         ['image_id' => $imageId, 'server' => $server['name']]
                     );
 
@@ -209,8 +210,8 @@ class Download extends BaseCommand
             // file already exists, but size doesn't match expected - incomplete download?
             $this->log(
                 'warning',
-                'Backup file [{$filePath}] already exists, but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter',
-                'Existing file size does not match expected, but size does not match expected',
+                "Backup file [{$filePath}] already exists, but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                "Existing file size does not match expected, but size does not match expected",
                 compact('filePath', 'sizeGb', 'expectedSize')
             );
 
@@ -222,7 +223,19 @@ class Download extends BaseCommand
 
         $start = now();
 
-        $this->download($link['disks'][0]['compressed_url'], $path);
+        if ($this->option('wget'))
+        {
+            // use wget binary
+            if (!$this->downloadWget($link['disks'][0]['compressed_url'], $path))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            // use API
+            $this->download($link['disks'][0]['compressed_url'], $path);
+        }
 
         $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
         $this->line("Completed download for {$server['name']} in {$timeFormatted} seconds");
@@ -249,8 +262,8 @@ class Download extends BaseCommand
         {
             $this->log(
                 'error',
-                'Download size of {$sizeGb} GB does not match expected {$expectedSize} GB',
-                'Download size does not match expected',
+                "Download size of {$sizeGb} GB does not match expected {$expectedSize} GB",
+                "Download size does not match expected",
                 compact('sizeGb', 'expectedSize')
             );
 
@@ -293,6 +306,36 @@ class Download extends BaseCommand
 
         $progress->finish();
         $this->newLine();
+    }
+
+    protected function downloadWget(string $url, string $path) : bool
+    {
+        $this->log(
+            'notice',
+            "Downloading [{$url}] to [{$path}] using wget",
+            "Downloading image using wget",
+            compact('url', 'path')
+        );
+
+        $wget = config('binarylane.wget_binary');
+
+        $cmd = "{$wget} {$url} -O {$path}";
+
+        $result = $this->processWget($cmd, Storage::disk('downloads')->path(''));
+
+        if ($result->failed())
+        {
+            $output = $result->errorOutput();
+
+            $this->log(
+                'error',
+                "Could not download file: " . $output,
+                "Could not download file",
+                compact('output', 'cmd')
+            );
+        }
+
+        return $result->successful();
     }
 
     protected function getStoragePath(array $server) : string

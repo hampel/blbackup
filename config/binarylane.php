@@ -61,5 +61,14 @@ return [
         'remote' => env('RCLONE_REMOTE'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Wget Path
+    |--------------------------------------------------------------------------
+    |
+    | Path to wget executable for downloading images
+    */
+
+    'wget_binary' => env('WGET_BINARY', '/usr/bin/wget'),
 
 ];
