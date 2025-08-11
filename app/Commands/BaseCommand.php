@@ -184,11 +184,18 @@ abstract class BaseCommand extends Command
                         return empty($line);
                     })
                     ->each(function (string $line) use (&$count, &$lineCount, &$last, $progress) {
-                        if ($lineCount < 6)
+                        if ($lineCount < 8)
                         {
-                            $this->line($line);
+                            if (preg_match("/\.\.\.\./", $line))
+                            {
+                                // skip
+                            }
+                            else
+                            {
+                                $this->line($line);
+                            }
                         }
-                        elseif ($lineCount == 6)
+                        elseif ($lineCount == 8)
                         {
                             $progress->start();
                         }
