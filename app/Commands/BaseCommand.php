@@ -211,7 +211,7 @@ abstract class BaseCommand extends Command
                         {
                             // skip these partial lines
                         }
-                        elseif (strlen(trim($line, " .")) <= 15)
+                        elseif (strlen(trim($line, " .")) <= 20)
                         {
                             // skip short lines
                         }
