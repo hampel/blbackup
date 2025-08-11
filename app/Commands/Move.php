@@ -4,7 +4,6 @@ namespace App\Commands;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
 class Move extends BaseCommand
@@ -102,7 +101,7 @@ class Move extends BaseCommand
             compact('cmd')
         );
 
-        $result = Process::forever()->path(Storage::disk('downloads')->path(''))->run($cmd);
+        $result = $this->process($cmd, Storage::disk('downloads')->path(''), true);
 
         if ($result->failed())
         {

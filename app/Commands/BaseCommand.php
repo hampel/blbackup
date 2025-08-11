@@ -3,7 +3,9 @@
 use App\Api;
 use App\Exceptions\BinaryLaneException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 use Symfony\Component\Console\Input\InputInterface;
@@ -111,5 +113,52 @@ abstract class BaseCommand extends Command
             $this->output->isQuiet() => ' --quiet',
             default => '',
         };
+    }
+
+    protected function process(string $cmd, string $path = '', bool $deleteLines = false) : ProcessResult
+    {
+        $count = 0;
+
+        return Process::forever()
+            ->path($path)
+            ->run($cmd, function (string $type, string $output) use (&$count, $deleteLines) {
+
+                if ($type === 'out')
+                {
+                    if ($deleteLines)
+                    {
+                        $linecount = count(explode("\n", $output));
+
+                        if ($count > 0)
+                        {
+                            if ($linecount > 0)
+                            {
+                                // delete current line
+                                $this->output->write("\x0D");
+                                $this->output->write("\x1B[2K");
+
+                                // delete the remaining $i - 1 lines
+                                for ($i = 1; $i < $linecount; $i++)
+                                {
+                                    $this->output->write("\x1B[1A");
+                                    $this->output->write("\x1B[2K");
+                                }
+                            }
+                        }
+
+                        $this->output->write($output);
+                    }
+                    else
+                    {
+                        $this->line($output);
+                    }
+
+                    $count++;
+                }
+                else
+                {
+                    $this->error($output);
+                }
+            });
     }
 }
