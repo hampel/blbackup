@@ -230,6 +230,13 @@ class Download extends BaseCommand
 
         if (!$this->option('no-test') && !$this->testDownload($path))
         {
+            $this->log(
+                'warning',
+                "Deleting invalid download file [{$path}]",
+                "Deleting invalid download file",
+                compact('path')
+            );
+
             Storage::disk('downloads')->delete($filePath);
             return false;
         }
