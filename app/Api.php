@@ -26,7 +26,7 @@ class Api
 
     public function server(int $server_id) : array
     {
-        Log::debug('api::account', compact(['server_id']));
+        Log::debug('api::server', compact(['server_id']));
 
         try
         {
