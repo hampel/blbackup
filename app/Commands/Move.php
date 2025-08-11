@@ -60,6 +60,10 @@ class Move extends BaseCommand
                     {
                         $this->line("Nothing to be moved");
                     }
+                    elseif ($this->option('dry-run'))
+                    {
+                        $this->line("The following files would be moved from downloads to remote:");
+                    }
                 })
                 ->each(function ($path) {
                     $this->moveFile($path);
@@ -83,7 +87,7 @@ class Move extends BaseCommand
 
         if ($this->option('dry-run'))
         {
-            $this->line($path);
+            $this->line("Move [{$path}] to remote");
             return true;
         }
 
