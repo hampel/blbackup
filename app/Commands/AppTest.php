@@ -12,7 +12,7 @@ use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class Test extends Command
+class AppTest extends Command
 {
     /**
      * The name and signature of the console command.

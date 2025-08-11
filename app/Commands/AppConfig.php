@@ -6,7 +6,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Stringable;
 use LaravelZero\Framework\Commands\Command;
 
-class Config extends Command
+class AppConfig extends Command
 {
     /**
      * The name and signature of the console command.
