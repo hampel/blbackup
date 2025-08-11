@@ -161,4 +161,41 @@ abstract class BaseCommand extends Command
                 }
             });
     }
+
+    protected function testDownload(string $path) : bool
+    {
+        $binary = config('binarylane.zstd_binary');
+
+        $cmd = "{$binary} --test --no-progress {$path}";
+
+        $this->log(
+            'notice',
+            "Testing download [{$path}]",
+            "Testing download",
+            compact('cmd')
+        );
+
+        $result = Process::forever()->path(storage_path())->run($cmd);
+
+        if ($result->failed())
+        {
+            $output = $result->errorOutput();
+
+            $this->log(
+                'error',
+                "Downloaded file failed zstd test: " . $output,
+                "Downloaded file failed zstd test",
+                compact('path', 'output')
+            );
+        }
+        else
+        {
+            $this->log(
+                'notice',
+                "zstd test successful",
+                "zstd test successful");
+        }
+
+        return $result->successful();
+    }
 }

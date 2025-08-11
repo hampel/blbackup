@@ -308,36 +308,6 @@ class Download extends BaseCommand
         return $storagePath;
     }
 
-    protected function testDownload(string $path) : bool
-    {
-        $binary = config('binarylane.zstd_binary');
-
-        $cmd = "{$binary} --test {$path}";
-
-        $this->log(
-            'notice',
-            "Testing download [{$path}]",
-            "Testing download",
-            compact('cmd')
-        );
-
-        $result = Process::forever()->path(storage_path())->run($cmd);
-
-        if ($result->failed())
-        {
-            $output = $result->errorOutput();
-
-            $this->log(
-                'error',
-                "Downloaded file failed zstd test: " . $output,
-                "Downloaded file failed zstd test",
-                compact('path', 'output')
-            );
-        }
-
-        return $result->successful();
-    }
-
     /**
      * Define the command's schedule.
      */
