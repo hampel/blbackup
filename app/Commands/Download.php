@@ -188,16 +188,36 @@ class Download extends BaseCommand
 
         if (Storage::disk('downloads')->exists($filePath) && !$this->option('force'))
         {
-            // TODO: check file size and if smaller than expected, resume downloading
+            $size = Storage::disk('downloads')->size($filePath);
+            $sizeGb = $size / (1024 * 1024 * 1024);
+            $expectedSize = $image['size_gigabytes'];
 
+            if ($sizeGb == $expectedSize)
+            {
+                // file already exists, is the expected size, and we aren't forcing download - so notify and return
+
+                $this->log(
+                    'notice',
+                    "Backup file [{$filePath}] already exists, use the --force flag to over-ride",
+                    "Backup file already exists, aborting",
+                    ['path' => $filePath]
+                );
+
+                return false;
+            }
+
+            // file already exists, but size doesn't match expected - incomplete download?
             $this->log(
-                'notice',
-                "Backup file [{$filePath}] already exists, use the --force flag to over-ride",
-                "Backup file already exists, aborting",
-                ['path' => $filePath]
+                'warning',
+                'Backup file [{$filePath}] already exists, but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter',
+                'Existing file size does not match expected, but size does not match expected',
+                compact('filePath', 'sizeGb', 'expectedSize')
             );
 
             return false;
+
+            // TODO: check file size and if smaller than expected, resume downloading
+
         }
 
         $start = now();
