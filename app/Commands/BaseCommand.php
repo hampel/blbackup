@@ -204,6 +204,10 @@ abstract class BaseCommand extends Command
                         {
                             // skip these partial lines
                         }
+                        elseif (strlen(trim($line, " .")) <= 15)
+                        {
+                            // skip short lines
+                        }
                         else
                         {
                             $this->line("[{$line}]");
