@@ -195,7 +195,9 @@ class Download extends BaseCommand
             Storage::disk('downloads')->makeDirectory($server['name']);
         }
 
-        $path = "{$server['name']}/backup-{$date}-{$image['id']}.zst";
+        $serverName = collect(explode('.', $server['name']))->first();
+
+        $path = "{$server['name']}/backup-{$serverName}-{$date}-{$image['id']}.zst";
 
         if (Storage::disk('downloads')->exists($path) && !$this->option('force'))
         {
