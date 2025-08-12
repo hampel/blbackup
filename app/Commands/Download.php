@@ -4,8 +4,8 @@ namespace App\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
@@ -182,14 +182,24 @@ class Download extends BaseCommand
     protected function downloadImage(array $image, array $server, array $link) : bool
     {
         $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->format("Ymd-His");
-        $storagePath = $this->getStoragePath($server);
-        $filePath = "{$storagePath}/backup-{$date}-{$image['id']}.zst";
 
-        $path = Storage::disk('downloads')->path($filePath);
-
-        if (Storage::disk('downloads')->exists($filePath) && !$this->option('force'))
+        if (!Storage::disk('downloads')->exists($server['name']))
         {
-            $size = Storage::disk('downloads')->size($filePath);
+            $this->log(
+                'notice',
+                "Download path does not exist for {$server['name']}, creating",
+                "Download path does not exist, creating",
+                ['server' => $server['name']]
+            );
+
+            Storage::disk('downloads')->makeDirectory($server['name']);
+        }
+
+        $path = "{$server['name']}/backup-{$date}-{$image['id']}.zst";
+
+        if (Storage::disk('downloads')->exists($path) && !$this->option('force'))
+        {
+            $size = Storage::disk('downloads')->size($path);
             $sizeGb = $size / (1024 * 1024 * 1024);
             $expectedSize = $image['size_gigabytes'];
 
@@ -199,9 +209,9 @@ class Download extends BaseCommand
 
                 $this->log(
                     'notice',
-                    "Backup file for {$server['name']} already exists at [{$filePath}], use the --force flag to over-ride",
+                    "Backup file for {$server['name']} already exists at [{$path}], use the --force flag to over-ride",
                     "Backup file already exists, aborting",
-                    ['server' => $server['name'], 'path' => $filePath]
+                    ['server' => $server['name'], 'path' => $path]
                 );
 
                 return false;
@@ -210,9 +220,9 @@ class Download extends BaseCommand
             // file already exists, but size doesn't match expected - incomplete download?
             $this->log(
                 'warning',
-                "Backup file for {$server['name']} already exists at [{$filePath}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                "Backup file for {$server['name']} already exists at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
                 "Existing file size does not match expected, but size does not match expected",
-                ['server' => $server['name'], 'path' => $filePath, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
             return false;
@@ -230,12 +240,14 @@ class Download extends BaseCommand
             ['server' => $server['name'], 'url' => $url, 'path' => $path]
         );
 
+        $fullPath = Storage::disk('downloads')->path($path);
+
         $start = now();
 
         if ($this->option('wget'))
         {
             // use wget binary
-            if (!$this->downloadWget($url, $path))
+            if (!$this->downloadWget($url, $fullPath))
             {
                 return false;
             }
@@ -243,7 +255,7 @@ class Download extends BaseCommand
         else
         {
             // use API
-            $this->download($url, $path);
+            $this->download($url, $fullPath);
         }
 
         $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
@@ -259,11 +271,11 @@ class Download extends BaseCommand
                 ['server' => $server['name'], 'path' => $path]
             );
 
-            Storage::disk('downloads')->delete($filePath);
+            Storage::disk('downloads')->delete($path);
             return false;
         }
 
-        $size = Storage::disk('downloads')->size($filePath);
+        $size = Storage::disk('downloads')->size($path);
         $sizeGb = $size / (1024 * 1024 * 1024);
         $expectedSize = $image['size_gigabytes'];
 
@@ -273,7 +285,7 @@ class Download extends BaseCommand
                 'error',
                 "Downloaded backup file for {$server['name']}, size of {$sizeGb} GB does not match expected {$expectedSize} GB",
                 "Download size does not match expected",
-                ['server' => $server['name'], 'path' => $filePath, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
             return false;
@@ -281,14 +293,19 @@ class Download extends BaseCommand
 
         $sizeFormatted = Number::format($sizeGb, 2);
 
-        $this->line("Successfully downloaded {$sizeFormatted} GB to [{$filePath}]");
+        $this->line("Successfully downloaded {$sizeFormatted} GB to [{$path}]");
 
         if ($this->option('move'))
         {
-            return $this->call('move', ['file' => $filePath]);
+            return $this->call('move', ['file' => $path]);
         }
 
         return true;
+    }
+
+    protected function testDownload(string $path) : bool
+    {
+        return $this->call('check', ['file' => $path]) == self::SUCCESS ? true : false;
     }
 
     protected function download(string $url, string $path) : void
