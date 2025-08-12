@@ -3,15 +3,11 @@
 use App\Api;
 use App\Exceptions\BinaryLaneException;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
-use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use function PHPUnit\Framework\isInstanceOf;
 
 abstract class BaseCommand extends Command
 {
@@ -53,7 +49,7 @@ abstract class BaseCommand extends Command
         {
             Log::error($exception);
         }
-        elseif (isInstanceOf(\Throwable::class, $exception))
+        elseif ($exception instanceof \Throwable)
         {
             Log::error($exception->getMessage());
         }
@@ -116,41 +112,6 @@ abstract class BaseCommand extends Command
         };
     }
 
-    protected function process(string $cmd, string $path = '', bool $deleteLines = false, bool $treatStdErrAsOut = false) : ProcessResult
-    {
-        $count = 0;
-
-        return Process::forever()
-            ->path($path)
-            ->run($cmd, function (string $type, string $output) use (&$count, $deleteLines, $treatStdErrAsOut) {
-
-                if ($type === 'out' || $treatStdErrAsOut)
-                {
-                    if ($deleteLines)
-                    {
-                        $linecount = count(explode("\n", $output));
-
-                        if ($count > 0)
-                        {
-                            $this->deleteLines($linecount);
-                        }
-
-                        $this->output->write($output);
-                    }
-                    else
-                    {
-                        $this->line($output);
-                    }
-
-                    $count++;
-                }
-                else
-                {
-                    $this->error($output);
-                }
-            });
-    }
-
     protected function deleteLines(int $count = 1)
     {
         if ($count > 0)
@@ -167,128 +128,4 @@ abstract class BaseCommand extends Command
         }
     }
 
-    protected function processWget(string $cmd, string $path = '') : ProcessResult
-    {
-        $count = 0;
-        $lineCount = 0;
-        $last = '';
-
-        $progress = new ProgressBar($this->output, 100);
-
-        $result = Process::forever()
-            ->path($path)
-            ->run($cmd, function (string $type, string $output) use (&$count, &$lineCount, &$last, $progress) {
-
-                collect(explode(PHP_EOL, $output))
-                    ->reject(function (string $line) {
-                        return empty($line);
-                    })
-                    ->each(function (string $line) use (&$count, &$lineCount, &$last, $progress) {
-                        if ($lineCount < 8)
-                        {
-                            if (preg_match("/\.\.\.\./", $line))
-                            {
-                                // skip
-                            }
-                            else
-                            {
-                                $this->line($line);
-                            }
-                        }
-                        elseif ($lineCount == 8)
-                        {
-                            $progress->start();
-                        }
-                        elseif (preg_match("/^\s*\d*\w\s*[\.\s]+(\d+)\%\s+[\d\.]+\w\s+[\d\w]+$/", $line, $matches))
-                        {
-                            $progress->setProgress(intval($matches[1]));
-                        }
-                        elseif (preg_match("/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\s\(/", $line))
-                        {
-                            $last = $line;
-                        }
-                        elseif (preg_match("/\.\.\./", $line))
-                        {
-                            // skip these partial lines
-                        }
-                        elseif (strlen(trim($line, " .")) <= 20)
-                        {
-                            // skip short lines
-                        }
-                        else
-                        {
-                            $this->line("[{$line}]");
-                        }
-
-                        $lineCount++;
-                    });
-
-                $count++;
-            });
-
-        $progress->finish();
-        $this->newLine(2);
-
-        $this->line($last);
-
-        return $result;
-    }
-
-    protected function processZstd(string $cmd, string $path = '') : ProcessResult
-    {
-        $last = '';
-
-        $result = Process::forever()
-            ->path($path)
-            ->run($cmd, function (string $type, string $output) use (&$last) {
-
-                $last = collect(explode("\r", $output))
-                    ->reject(function (string $line) {
-                        return empty(trim($line));
-                    })
-                    ->last();
-            });
-
-        $this->newLine();
-        $this->line($last);
-
-        return $result;
-    }
-
-    protected function testDownload(string $path) : bool
-    {
-        $binary = config('binarylane.zstd_binary');
-
-        $cmd = "{$binary} --test --no-progress {$path}";
-
-        $this->log(
-            'notice',
-            "Testing download [{$path}]",
-            "Testing download",
-            compact('cmd')
-        );
-
-        $result = $this->processZstd($cmd, storage_path());
-
-        if ($result->failed())
-        {
-            $output = $result->errorOutput();
-
-            $this->log(
-                'error',
-                "Downloaded file failed zstd test: " . $output,
-                "Downloaded file failed zstd test",
-                compact('path', 'output')
-            );
-        }
-        else
-        {
-            $this->log(
-                'notice',
-                "zstd test successful",
-                "zstd test successful");
-        }
-
-        return $result->successful();
-    }
 }

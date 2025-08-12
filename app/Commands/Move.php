@@ -3,7 +3,9 @@
 namespace App\Commands;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
 class Move extends BaseCommand
@@ -105,7 +107,7 @@ class Move extends BaseCommand
             compact('cmd')
         );
 
-        $result = $this->process($cmd, Storage::disk('downloads')->path(''), true);
+        $result = $this->processRclone($cmd, Storage::disk('downloads')->path(''), true);
 
         if ($result->failed())
         {
@@ -120,6 +122,41 @@ class Move extends BaseCommand
         }
 
         return $result->successful();
+    }
+
+    protected function processRclone(string $cmd, string $path = '', bool $deleteLines = false, bool $treatStdErrAsOut = false) : ProcessResult
+    {
+        $count = 0;
+
+        return Process::forever()
+            ->path($path)
+            ->run($cmd, function (string $type, string $output) use (&$count, $deleteLines, $treatStdErrAsOut) {
+
+                if ($type === 'out' || $treatStdErrAsOut)
+                {
+                    if ($deleteLines)
+                    {
+                        $linecount = count(explode("\n", $output));
+
+                        if ($count > 0)
+                        {
+                            $this->deleteLines($linecount);
+                        }
+
+                        $this->output->write($output);
+                    }
+                    else
+                    {
+                        $this->line($output);
+                    }
+
+                    $count++;
+                }
+                else
+                {
+                    $this->error($output);
+                }
+            });
     }
 
     /**

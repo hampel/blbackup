@@ -333,23 +333,71 @@ class Download extends BaseCommand
         return $result->successful();
     }
 
-    protected function getStoragePath(array $server) : string
+    protected function processWget(string $cmd, string $path = '') : ProcessResult
     {
-        $storagePath = "{$server['name']}";
+        $count = 0;
+        $lineCount = 0;
+        $last = '';
 
-        if (!Storage::disk('downloads')->exists($storagePath))
-        {
-            $this->log(
-                'notice',
-                "Storage path does not exist for {$server['name']}, creating",
-                "Storage path does not exist, creating",
-                ['path' => $storagePath]
-            );
+        $progress = new ProgressBar($this->output, 100);
 
-            Storage::disk('downloads')->makeDirectory($storagePath);
-        }
+        $result = Process::forever()
+            ->path($path)
+            ->run($cmd, function (string $type, string $output) use (&$count, &$lineCount, &$last, $progress) {
 
-        return $storagePath;
+                collect(explode(PHP_EOL, $output))
+                    ->reject(function (string $line) {
+                        return empty($line);
+                    })
+                    ->each(function (string $line) use (&$count, &$lineCount, &$last, $progress) {
+                        if ($lineCount < 8)
+                        {
+                            if (preg_match("/\.\.\.\./", $line))
+                            {
+                                // skip
+                            }
+                            else
+                            {
+                                $this->line($line);
+                            }
+                        }
+                        elseif ($lineCount == 8)
+                        {
+                            $progress->start();
+                        }
+                        elseif (preg_match("/^\s*\d*\w\s*[\.\s]+(\d+)\%\s+[\d\.]+\w\s+[\d\w]+$/", $line, $matches))
+                        {
+                            $progress->setProgress(intval($matches[1]));
+                        }
+                        elseif (preg_match("/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\s\(/", $line))
+                        {
+                            $last = $line;
+                        }
+                        elseif (preg_match("/\.\.\./", $line))
+                        {
+                            // skip these partial lines
+                        }
+                        elseif (strlen(trim($line, " .")) <= 20)
+                        {
+                            // skip short lines
+                        }
+                        else
+                        {
+                            $this->line("[{$line}]");
+                        }
+
+                        $lineCount++;
+                    });
+
+                $count++;
+            });
+
+        $progress->finish();
+        $this->newLine(2);
+
+        $this->line($last);
+
+        return $result;
     }
 
     /**
