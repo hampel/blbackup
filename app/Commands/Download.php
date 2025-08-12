@@ -165,7 +165,7 @@ class Download extends BaseCommand
                 {
                     $this->log(
                         'warning',
-                        "No download link found for image {$imageId}",
+                        "No download link found for {$server['name']} image {$imageId}",
                         "No download link found",
                         ['image_id' => $imageId, 'server' => $server['name']]
                     );
@@ -199,9 +199,9 @@ class Download extends BaseCommand
 
                 $this->log(
                     'notice',
-                    "Backup file [{$filePath}] already exists, use the --force flag to over-ride",
+                    "Backup file for {$server['name']} already exists at [{$filePath}], use the --force flag to over-ride",
                     "Backup file already exists, aborting",
-                    ['path' => $filePath]
+                    ['server' => $server['name'], 'path' => $filePath]
                 );
 
                 return false;
@@ -210,9 +210,9 @@ class Download extends BaseCommand
             // file already exists, but size doesn't match expected - incomplete download?
             $this->log(
                 'warning',
-                "Backup file [{$filePath}] already exists, but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                "Backup file for {$server['name']} already exists at [{$filePath}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
                 "Existing file size does not match expected, but size does not match expected",
-                compact('filePath', 'sizeGb', 'expectedSize')
+                ['server' => $server['name'], 'path' => $filePath, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
             return false;
@@ -221,12 +221,21 @@ class Download extends BaseCommand
 
         }
 
+        $url = $link['disks'][0]['compressed_url'];
+
+        $this->log(
+            'notice',
+            "Downloading {$server['name']} image from [{$url}] to [{$path}]",
+            "Downloading image",
+            ['server' => $server['name'], 'url' => $url, 'path' => $path]
+        );
+
         $start = now();
 
         if ($this->option('wget'))
         {
             // use wget binary
-            if (!$this->downloadWget($link['disks'][0]['compressed_url'], $path))
+            if (!$this->downloadWget($url, $path))
             {
                 return false;
             }
@@ -234,7 +243,7 @@ class Download extends BaseCommand
         else
         {
             // use API
-            $this->download($link['disks'][0]['compressed_url'], $path);
+            $this->download($url, $path);
         }
 
         $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
@@ -245,9 +254,9 @@ class Download extends BaseCommand
         {
             $this->log(
                 'warning',
-                "Deleting invalid download file [{$path}]",
+                "Deleting invalid backup file for {$server['name']} from [{$path}]",
                 "Deleting invalid download file",
-                compact('path')
+                ['server' => $server['name'], 'path' => $path]
             );
 
             Storage::disk('downloads')->delete($filePath);
@@ -262,9 +271,9 @@ class Download extends BaseCommand
         {
             $this->log(
                 'error',
-                "Download size of {$sizeGb} GB does not match expected {$expectedSize} GB",
+                "Downloaded backup file for {$server['name']}, size of {$sizeGb} GB does not match expected {$expectedSize} GB",
                 "Download size does not match expected",
-                compact('sizeGb', 'expectedSize')
+                ['server' => $server['name'], 'path' => $filePath, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
             return false;
@@ -284,13 +293,6 @@ class Download extends BaseCommand
 
     protected function download(string $url, string $path) : void
     {
-        $this->log(
-            'notice',
-            "Downloading [{$url}] to [{$path}]",
-            "Downloading image",
-            compact('url', 'path')
-        );
-
         $progress = new ProgressBar($this->output, 100);
         $progress->start();
 
@@ -310,13 +312,6 @@ class Download extends BaseCommand
 
     protected function downloadWget(string $url, string $path) : bool
     {
-        $this->log(
-            'notice',
-            "Downloading [{$url}] to [{$path}] using wget",
-            "Downloading image using wget",
-            compact('url', 'path')
-        );
-
         $wget = config('binarylane.wget_binary');
 
         $cmd = "{$wget} {$url} -O {$path}";
@@ -344,7 +339,13 @@ class Download extends BaseCommand
 
         if (!Storage::disk('downloads')->exists($storagePath))
         {
-            Log::notice("Storage path doesn't exist, creating", ['path' => $storagePath]);
+            $this->log(
+                'notice',
+                "Storage path does not exist for {$server['name']}, creating",
+                "Storage path does not exist, creating",
+                ['path' => $storagePath]
+            );
+
             Storage::disk('downloads')->makeDirectory($storagePath);
         }
 
