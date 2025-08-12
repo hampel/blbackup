@@ -2,8 +2,6 @@
 
 namespace App\Commands;
 
-use Illuminate\Console\Scheduling\Schedule;
-
 class Account extends BaseCommand
 {
     /**
