@@ -74,7 +74,7 @@ class Check extends BaseCommand
         }
         else
         {
-            $this->checkFile($file);
+            return $this->checkFile($file) ? self::SUCCESS : self::FAILURE;
         }
 
         return self::SUCCESS;
