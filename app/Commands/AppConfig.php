@@ -46,10 +46,11 @@ class AppConfig extends Command
 
         static::addToSection('BinaryLane', fn () => [
             'API Timeout' => config('binarylane.timeout'),
-            'ZSTD Binary' => config('binarylane.zstd_binary'),
+            'zstd Binary' => config('binarylane.zstd_binary'),
             'Keep Only Days' => config('binarylane.keeponly_days'),
-            'Rclone Binary' => config('binarylane.rclone.binary'),
-            'Rclone Remote' => config('binarylane.rclone.remote'),
+            'rclone Binary' => config('binarylane.rclone.binary'),
+            'rclone Remote' => config('binarylane.rclone.remote'),
+            'wget Binary' => config('binarylane.wget_binary'),
         ]);
 
         static::addToSection('Filesystems', fn () => [
