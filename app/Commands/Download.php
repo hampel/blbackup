@@ -186,7 +186,7 @@ class Download extends BaseCommand
         if (!Storage::disk('downloads')->exists($server['name']))
         {
             $this->log(
-                'notice',
+                'info',
                 "Download path does not exist for {$server['name']}, creating",
                 "Download path does not exist, creating",
                 ['server' => $server['name']]
