@@ -199,38 +199,77 @@ class Download extends BaseCommand
 
         $path = "{$server['name']}/backup-{$serverName}-{$date}-{$image['id']}.zst";
 
-        if (Storage::disk('downloads')->exists($path) && !$this->option('force'))
+        if (!$this->option('force'))
         {
-            $size = Storage::disk('downloads')->size($path);
-            $sizeGb = $size / (1024 * 1024 * 1024);
             $expectedSize = $image['size_gigabytes'];
 
-            if ($sizeGb == $expectedSize)
+            if (Storage::disk('downloads')->exists($path))
             {
-                // file already exists, is the expected size, and we aren't forcing download - so notify and return
+                // file already exists locally and we're not forcing downloads
 
+                $size = Storage::disk('downloads')->size($path);
+                $sizeGb = $size / (1024 * 1024 * 1024);
+
+                if ($sizeGb == $expectedSize)
+                {
+                    // file already exists, is the expected size, and we aren't forcing download - so notify and return
+
+                    $this->log(
+                        'notice',
+                        "Backup file for {$server['name']} already exists at [{$path}], use the --force flag to over-ride",
+                        "Backup file already exists, aborting",
+                        ['server' => $server['name'], 'path' => $path]
+                    );
+
+                    return false;
+                }
+
+                // file already exists, but size doesn't match expected - incomplete download?
                 $this->log(
-                    'notice',
-                    "Backup file for {$server['name']} already exists at [{$path}], use the --force flag to over-ride",
-                    "Backup file already exists, aborting",
-                    ['server' => $server['name'], 'path' => $path]
+                    'warning',
+                    "Backup file for {$server['name']} already exists at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                    "Existing file already exists, but size does not match expected",
+                    ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
                 );
 
                 return false;
+
+                // TODO: check file size and if smaller than expected, resume downloading
+
             }
 
-            // file already exists, but size doesn't match expected - incomplete download?
-            $this->log(
-                'warning',
-                "Backup file for {$server['name']} already exists at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
-                "Existing file size does not match expected, but size does not match expected",
-                ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
-            );
+            if ($this->option('move'))
+            {
+                $remoteFile = $this->remoteFileInfo($path);
 
-            return false;
+                if (!empty($remoteFile))
+                {
+                    $sizeGb = intval($remoteFile['Size'] ?? 0) / (1024 * 1024 * 1024);
 
-            // TODO: check file size and if smaller than expected, resume downloading
+                    if ($sizeGb == $expectedSize) {
+                        // file already exists, is the expected size, and we aren't forcing download - so notify and return
 
+                        $this->log(
+                            'notice',
+                            "Backup file for {$server['name']} already exists on remote at [{$path}], use the --force flag to over-ride",
+                            "Backup file already exists on remote, aborting",
+                            ['server' => $server['name'], 'path' => $path]
+                        );
+
+                        return false;
+                    }
+
+                    // file already exists, but size doesn't match expected - incomplete download?
+                    $this->log(
+                        'warning',
+                        "Backup file for {$server['name']} already exists on remote at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                        "Existing file already exists on remote, but size does not match expected",
+                        ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                    );
+
+                    return false;
+                }
+            }
         }
 
         $url = $link['disks'][0]['compressed_url'];
@@ -419,6 +458,39 @@ class Download extends BaseCommand
         $this->line($last);
 
         return $result;
+    }
+
+    protected function remoteFileInfo(string $path) : ?array
+    {
+        $rclone = config('binarylane.rclone.binary');
+        $remotePath = rtrim(config('binarylane.rclone.remote'), '/');
+
+        $cmd = "{$rclone} lsjson --stat --no-mimetype --no-modtime {$remotePath}/{$path}";
+
+        $this->logCmd('rclone lsjson', $cmd);
+
+        $result = Process::path(storage_path())->run($cmd);
+
+        if ($result->successful())
+        {
+            try
+            {
+                return json_decode($result->output(), true, 512, JSON_THROW_ON_ERROR);
+            }
+            catch (\JsonException $e)
+            {
+                $this->log(
+                    'error',
+                    "Could not decode json data for remote file info: " . $e->getMessage(),
+                    "Could not decode json info",
+                    ['error' => $e->getMessage()]
+                );
+
+                return null;
+            }
+        }
+
+        return [];
     }
 
     /**
