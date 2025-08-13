@@ -100,7 +100,7 @@ class Check extends BaseCommand
     {
         $binary = config('binarylane.zstd_binary');
 
-        $cmd = "{$binary} --test --no-progress {$path}";
+        $cmd = "{$binary} --test --no-progress --quiet {$path}";
 
         $this->logCmd('zstd test', $cmd);
 
