@@ -335,6 +335,8 @@ class Download extends BaseCommand
 
         $cmd = "{$wget} {$url} -O {$path}";
 
+        $this->logCmd('wget', $cmd);
+
         $result = $this->processWget($cmd, Storage::disk('downloads')->path(''));
 
         if ($result->failed())

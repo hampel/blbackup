@@ -100,6 +100,8 @@ class Move extends BaseCommand
         $dryrun = $this->option('dry-run') ? ' --dry-run' : '';
         $cmd = "{$rclone}{$verbosity}{$dryrun} --progress moveto {$sourcePath} {$remotePath}";
 
+        $this->logCmd('rclone moveto', $cmd);
+
         $this->log(
             'notice',
             "Moving backup file from [{$path}] to [{$remotePath}]",

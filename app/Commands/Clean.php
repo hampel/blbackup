@@ -99,7 +99,9 @@ class Clean extends BaseCommand
 
             $cmd = "{$rclone} lsjson -R  {$remotePath}";
 
-            $result = Process::run($cmd);
+            $this->logCmd('rclone lsjson', $cmd);
+
+            $result = Process::path(storage_path())->run($cmd);
 
             if ($result->failed())
             {
@@ -168,7 +170,9 @@ class Clean extends BaseCommand
 
                         $cmd = "{$rclone}{$verbosity} deletefile {$remotePath}/{$path}";
 
-                        $result = Process::run($cmd);
+                        $this->logCmd('rclone deletefile', $cmd);
+
+                        $result = Process::path(storage_path())->run($cmd);
 
                         if ($result->failed())
                         {

@@ -124,11 +124,13 @@ class Check extends BaseCommand
 
         $cmd = "{$binary} --test --no-progress {$path}";
 
+        $this->logCmd('zstd test', $cmd);
+
         $this->log(
             'notice',
             "Testing download [{$path}]",
             "Testing download",
-            compact('cmd')
+            compact('path')
         );
 
         $result = $this->processZstd($cmd, storage_path());
@@ -141,7 +143,7 @@ class Check extends BaseCommand
                 'error',
                 "Downloaded file failed zstd test: " . $output,
                 "Downloaded file failed zstd test",
-                compact('path', 'output')
+                compact('path', 'output', 'cmd')
             );
         }
         else

@@ -89,6 +89,11 @@ abstract class BaseCommand extends Command
         $this->line($message, $style, $verbosity);
     }
 
+    protected function logCmd($description, $cmd)
+    {
+        Log::debug($description, compact('cmd'));
+    }
+
     protected function section($string, $verbosity = null)
     {
         if (! $this->output->getFormatter()->hasStyle('section')) {
