@@ -26,7 +26,7 @@ class Download extends BaseCommand
                             {--exclude= : exclude this list of servers}
                             {--f|force : force re-download of existing backup}
                             {--no-test : skip testing of downloaded files}
-                            {--wget : use wget to fetch files rather than internet php code}
+                            {--no-wget : do not use wget to download files}
                             {--m|move : move files to secondary storage after downloading}';
 
     /**
@@ -285,18 +285,19 @@ class Download extends BaseCommand
 
         $start = now();
 
-        if ($this->option('wget'))
+        if ($this->option('no-wget'))
+        {
+            // use Http client
+            $this->downloadHttp($url, $fullPath);
+        }
+        else
         {
             // use wget binary
             if (!$this->downloadWget($url, $fullPath))
             {
                 return false;
             }
-        }
-        else
-        {
-            // use API
-            $this->download($url, $fullPath);
+
         }
 
         $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
@@ -349,7 +350,7 @@ class Download extends BaseCommand
         return $this->call('check', ['file' => $path]) == self::SUCCESS ? true : false;
     }
 
-    protected function download(string $url, string $path) : void
+    protected function downloadHttp(string $url, string $path) : void
     {
         $progress = new ProgressBar($this->output, 100);
         $progress->start();
