@@ -105,7 +105,7 @@ class Clean extends BaseCommand
 
             if ($result->failed())
             {
-                $output = $result->errorOutput();
+                $output = trim($result->errorOutput());
 
                 $this->log(
                     'error',
@@ -176,7 +176,7 @@ class Clean extends BaseCommand
 
                         if ($result->failed())
                         {
-                            $output = $result->errorOutput();
+                            $output = trim($result->errorOutput());
 
                             $this->log(
                                 'error',

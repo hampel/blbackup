@@ -381,7 +381,7 @@ class Download extends BaseCommand
 
         if ($result->failed())
         {
-            $output = $result->errorOutput();
+            $output = trim($result->errorOutput());
 
             $this->log(
                 'error',
