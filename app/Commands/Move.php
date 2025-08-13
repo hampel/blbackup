@@ -18,6 +18,7 @@ class Move extends BaseCommand
     protected $signature = 'move
                             {file? : file to move, relative to download path}
                             {--all : move all files}
+                            {--remote= : rclone remote to move file to}
                             {--dry-run : don\'t move any files, test only}';
 
     /**
@@ -34,6 +35,16 @@ class Move extends BaseCommand
      */
     public function handle()
     {
+        $remote = $this->option('remote') ?? config('binarylane.rclone.remote');
+        if (empty($remote))
+        {
+            $this->fail("No remote configured - specify RCLONE_REMOTE in .env file or use --remote option");
+        }
+        elseif (!$this->isValidRemote($remote))
+        {
+            $this->fail("Invalid remote - please refer to rclone documentation for usage");
+        }
+
         $file = $this->argument('file');
 
         if ($this->option('all'))
@@ -67,19 +78,19 @@ class Move extends BaseCommand
                         $this->line("The following files would be moved from downloads to remote:");
                     }
                 })
-                ->each(function ($path) {
-                    $this->moveFile($path);
+                ->each(function ($path) use ($remote) {
+                    $this->moveFile($remote, $path);
                 });
         }
         else
         {
-            $this->moveFile($file);
+            $this->moveFile($remote, $file);
         }
 
         return self::SUCCESS;
     }
 
-    protected function moveFile(string $path) : bool
+    protected function moveFile(string $remote, string $path) : bool
     {
         if (!Storage::disk('downloads')->exists($path))
         {
@@ -87,15 +98,17 @@ class Move extends BaseCommand
             return false;
         }
 
+        $remotePath = rtrim($remote, '/') . '/' . $path;
+
         if ($this->option('dry-run'))
         {
-            $this->line("Move [{$path}] to remote");
+            $this->line("Move [{$path}] to remote [{$remotePath}]");
             return true;
         }
 
         $rclone = config('binarylane.rclone.binary');
         $sourcePath = Storage::disk('downloads')->path($path);
-        $remotePath = rtrim(config('binarylane.rclone.remote'), '/') . '/' . $path;
+
         $verbosity = $this->getVerbosity();
         $dryrun = $this->option('dry-run') ? ' --dry-run' : '';
         $cmd = "{$rclone}{$verbosity}{$dryrun} --progress moveto {$sourcePath} {$remotePath}";
@@ -106,10 +119,10 @@ class Move extends BaseCommand
             'notice',
             "Moving backup file from [{$path}] to [{$remotePath}]",
             "Moving backup file to secondary storage",
-            compact('cmd')
+            ['source' => $path, 'remote' => $remotePath]
         );
 
-        $result = $this->processRclone($cmd, Storage::disk('downloads')->path(''), true);
+        $result = $this->processRclone($cmd, storage_path(), true);
 
         if ($result->failed())
         {
@@ -159,6 +172,30 @@ class Move extends BaseCommand
                     $this->error($output);
                 }
             });
+    }
+
+    protected function isValidRemote(string $remote) : bool
+    {
+        $rclone = config('binarylane.rclone.binary');
+        $cmd = "{$rclone} lsd --quiet {$remote}";
+
+        $this->logCmd('rclone lsd', $cmd);
+
+        $result = Process::path(storage_path())->run($cmd);
+
+        if ($result->failed())
+        {
+            $output = trim($result->errorOutput());
+
+            $this->log(
+                'error',
+                "Could not get remote directory list: " . $output,
+                "Could not get remote directory list",
+                compact('output')
+            );
+        }
+
+        return $result->successful();
     }
 
     /**
