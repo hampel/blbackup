@@ -25,10 +25,9 @@ class Check extends BaseCommand
      *
      * @var string
      */
-    protected $description = 'Check downloaded backup files for zstd vailitidy';
+    protected $description = 'Check downloaded backup files for zstd validity';
 
     protected string $commandContext = 'check';
-
 
     /**
      * Execute the console command.
