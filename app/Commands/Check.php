@@ -97,27 +97,6 @@ class Check extends BaseCommand
         return $this->testDownload(Storage::disk('downloads')->path($path));
     }
 
-    protected function processZstd(string $cmd, string $path = '') : ProcessResult
-    {
-        $last = '';
-
-        $result = Process::forever()
-            ->path($path)
-            ->run($cmd, function (string $type, string $output) use (&$last) {
-
-                $last = collect(explode("\r", $output))
-                    ->reject(function (string $line) {
-                        return empty(trim($line));
-                    })
-                    ->last();
-            });
-
-        $this->newLine();
-        $this->line($last);
-
-        return $result;
-    }
-
     protected function testDownload(string $path) : bool
     {
         $binary = config('binarylane.zstd_binary');
@@ -133,7 +112,7 @@ class Check extends BaseCommand
             compact('path')
         );
 
-        $result = $this->processZstd($cmd, storage_path());
+        $result = $this->processZstd($cmd, Storage::disk('downloads')->path(''));
 
         if ($result->failed())
         {
@@ -155,6 +134,27 @@ class Check extends BaseCommand
         }
 
         return $result->successful();
+    }
+
+    protected function processZstd(string $cmd, string $path = '') : ProcessResult
+    {
+        $last = '';
+
+        $result = Process::forever()
+            ->path($path)
+            ->run($cmd, function (string $type, string $output) use (&$last) {
+
+                $last = collect(explode("\r", $output))
+                    ->reject(function (string $line) {
+                        return empty(trim($line));
+                    })
+                    ->last();
+            });
+
+        $this->newLine();
+        $this->line($last);
+
+        return $result;
     }
 
     /**
