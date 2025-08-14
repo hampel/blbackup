@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use Carbon\CarbonInterval;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 
 class Move extends BaseCommand
 {
@@ -106,6 +108,8 @@ class Move extends BaseCommand
             return true;
         }
 
+        $size = Storage::disk('downloads')->size($path);
+
         $rclone = config('binarylane.rclone.binary');
         $sourcePath = Storage::disk('downloads')->path($path);
 
@@ -122,9 +126,31 @@ class Move extends BaseCommand
             ['source' => $path, 'remote' => $remotePath]
         );
 
+        $start = now();
+
         $result = $this->processRclone($cmd, storage_path(), true);
 
-        if ($result->failed())
+        if ($result->successful())
+        {
+            $seconds = $start->diffInSeconds(now());
+            $mb = $size / (1024 * 1024);
+            $speed = Number::format($mb / $seconds, 1);
+
+            $elapsed = CarbonInterval::seconds($seconds)->cascade()->forHumans();
+            $secondsFormatted = Number::format($seconds, 1);
+
+            $this->newLine();
+            $this->log(
+                'notice',
+                "Completed move to remote in {$elapsed} ({$speed} MB/s)",
+                "Completed move to remote",
+                ['remote' => $remotePath, 'elapsed' => $elapsed, 'seconds' => $secondsFormatted, 'megabytes_per_second' => $speed]
+            );
+            $this->newLine();
+
+            return true;
+        }
+        else
         {
             $output = trim($result->errorOutput());
 
@@ -134,9 +160,9 @@ class Move extends BaseCommand
                 "Could not move file to secondary storage",
                 compact('output', 'cmd')
             );
-        }
 
-        return $result->successful();
+            return false;
+        }
     }
 
     protected function processRclone(string $cmd, string $path = '', bool $deleteLines = false, bool $treatStdErrAsOut = false) : ProcessResult

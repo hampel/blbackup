@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use Carbon\Carbon;
+use Carbon\CarbonInterval;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
@@ -199,10 +200,10 @@ class Download extends BaseCommand
 
         $path = "{$server['name']}/backup-{$serverName}-{$date}-{$image['id']}.zst";
 
+        $expectedSize = $image['size_gigabytes'];
+
         if (!$this->option('force'))
         {
-            $expectedSize = $image['size_gigabytes'];
-
             if (Storage::disk('downloads')->exists($path))
             {
                 // file already exists locally and we're not forcing downloads
@@ -297,11 +298,22 @@ class Download extends BaseCommand
             {
                 return false;
             }
-
         }
 
-        $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
-        $this->line("Completed download for {$server['name']} in {$timeFormatted} seconds");
+        $seconds = $start->diffInSeconds(now());
+        $mb = $expectedSize * 1024;
+        $speed = Number::format($mb / $seconds, 1);
+
+        $elapsed = CarbonInterval::seconds($seconds)->cascade()->forHumans();
+        $secondsFormatted = Number::format($seconds, 1);
+
+        $this->newLine();
+        $this->log(
+            'notice',
+            "Completed download for {$server['name']} in {$elapsed} ({$speed} MB/s)",
+            "Completed download",
+            ['server' => $server['name'], 'elapsed' => $elapsed, 'seconds' => $secondsFormatted, 'megabytes_per_second' => $speed]
+        );
         $this->newLine();
 
         if (!$this->option('no-test') && !$this->testDownload($path))

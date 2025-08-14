@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use Carbon\CarbonInterval;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -191,12 +192,16 @@ class Create extends BaseCommand
             $progress->finish();
             $this->newLine();
 
-            $timeFormatted = Number::format($start->diffInSeconds(now()), 1);
+            $seconds = $start->diffInSeconds(now());
+            $elapsed = CarbonInterval::seconds($seconds)->cascade()->forHumans();
+            $secondsFormatted = Number::format($seconds, 1);
+
+            $this->newLine();
             $this->log(
                 'notice',
-                "Completed server backup {$server['name']} in {$timeFormatted} seconds",
+                "Completed server backup {$server['name']} in {$elapsed}",
                 "Completed server backup",
-                ['time_seconds' => $timeFormatted, 'server_id' => $server['id'], 'disk_size' => $server['disk'], 'name' => $server['name']]
+                ['server' => $server['name'], 'server_id' => $server['id'], 'seconds' => $secondsFormatted, 'elapsed' => $elapsed, 'disk_size' => $server['disk']]
             );
             $this->newLine();
 
@@ -208,7 +213,7 @@ class Create extends BaseCommand
                 'error',
                 "Error backing up {$server['name']} - status: {$status['status']}",
                 "Error backing up server",
-                ['status' => $status['status'], 'server_id' => $server['id'], 'disk_size' => $server['disk'], 'name' => $server['name']]
+                ['server' => $server['name'], 'server_id' => $server['id'], 'status' => $status['status'], 'disk_size' => $server['disk']]
             );
 
             return false;
