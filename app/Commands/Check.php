@@ -111,7 +111,7 @@ class Check extends BaseCommand
             compact('path')
         );
 
-        $result = $this->processZstd($cmd, Storage::disk('downloads')->path(''));
+        $result = Process::path(Storage::disk('downloads')->path(''))->run($cmd);
 
         if ($result->failed())
         {
@@ -133,27 +133,6 @@ class Check extends BaseCommand
         }
 
         return $result->successful();
-    }
-
-    protected function processZstd(string $cmd, string $path = '') : ProcessResult
-    {
-        $last = '';
-
-        $result = Process::forever()
-            ->path($path)
-            ->run($cmd, function (string $type, string $output) use (&$last) {
-
-                $last = collect(explode("\r", $output))
-                    ->reject(function (string $line) {
-                        return empty(trim($line));
-                    })
-                    ->last();
-            });
-
-        $this->newLine();
-        $this->line($last);
-
-        return $result;
     }
 
     /**
