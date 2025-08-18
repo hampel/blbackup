@@ -72,7 +72,8 @@ class AppTest extends Command
                         $progress->setProgress(intval(round(($downloadedBytes / $downloadTotal) * 100)));
                     }
                 }])
-                ->timeout(3600)
+                ->timeout(config('binarylane.timeout'))
+                ->retry(3, 100)
                 ->get($url);
 
             $progress->finish();
