@@ -16,6 +16,8 @@ class AppServiceProvider extends ServiceProvider
         Http::macro('binarylane', function () : PendingRequest {
             return Http::withToken(config('binarylane.api_token'))->baseUrl('https://api.binarylane.com.au/v2');
         });
+
+        date_default_timezone_set(config('binarylane.timezone', 'UTC'));
     }
 
     /**

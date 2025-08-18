@@ -71,4 +71,13 @@ return [
 
     'wget_binary' => env('WGET_BINARY', '/usr/bin/wget'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Download Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Timezone to display dates in
+    */
+
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 ];

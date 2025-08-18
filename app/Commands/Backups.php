@@ -23,7 +23,7 @@ class Backups extends BaseCommand
      *
      * @var string
      */
-    protected $description = 'List backups for a server';
+    protected $description = 'List backups on BinaryLane';
 
     protected string $commandContext = 'backups';
 
@@ -56,7 +56,7 @@ class Backups extends BaseCommand
             else
             {
                 $this->newLine();
-                $this->line("All backup images");
+                $this->line("All backup images on BinaryLane");
                 $this->newLine();
 
                 // no options specified, just show a list of backup images
@@ -130,13 +130,13 @@ class Backups extends BaseCommand
                     'image_id' => Str::padLeft($image['id'], 9),
                     'full_name' => $image['full_name'],
                     'created_at' => $created->toDateTimeString(),
-                    'created_at_local' => $created->timezone(config('app.timezone'))->toDateTimeString(),
+                    'created_at_local' => $created->timezone(config('binarylane.timezone'))->toDateTimeString(),
                     'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
                 ];
             });
 
         $this->table(
-            ['Backup ID', 'Backup Name', 'Created', 'Created (local TZ)', 'Size GB'],
+            ['Backup ID', 'Backup Name', 'Created (UTC)', 'Created (local TZ)', 'Size GB'],
             $table
         );
 

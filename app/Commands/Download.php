@@ -182,7 +182,9 @@ class Download extends BaseCommand
 
     protected function downloadImage(array $image, array $server, array $link) : bool
     {
-        $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])->format("Ymd-His");
+        $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])
+            ->setTimezone(config('binarylane.timezone'))
+            ->format("Ymd-His");
 
         if (!Storage::disk('downloads')->exists($server['name']))
         {

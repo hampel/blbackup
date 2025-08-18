@@ -40,8 +40,7 @@ class AppConfig extends Command
             'Laravel Version' => $this->app::VERSION,
             'PHP Version' => phpversion(),
             'Environment' => $this->laravel->environment(),
-            'Debug Mode' => config('app.debug') ? '<fg=yellow;options=bold>ENABLED</>' : 'OFF',
-            'Timezone' => config('app.timezone'),
+            'Timezone' => config('binarylane.timezone'),
         ]);
 
         static::addToSection('BinaryLane', fn () => [
