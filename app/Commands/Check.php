@@ -110,7 +110,7 @@ class Check extends BaseCommand
             compact('path')
         );
 
-        $result = Process::path(Storage::disk('downloads')->path(''))->run($cmd);
+        $result = Process::forever()->path(Storage::disk('downloads')->path(''))->run($cmd);
 
         if ($result->failed())
         {
