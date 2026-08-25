@@ -40,7 +40,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'null'),
+    'default' => env('LOG_CHANNEL', 'stack'),
 
     /*
     |--------------------------------------------------------------------------

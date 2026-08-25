@@ -182,7 +182,10 @@ timezone lives as `binarylane.timezone` and is applied with
 `getcwd()` when running inside a Phar, so a compiled binary resolves `.env`, logs
 and the default download path relative to the working directory.
 
-**Logging is off by default** — `logging.default` is `null`. A real install sets
+**Logging still resolves to nothing until `LOG_STACK` is set.** `logging.default`
+is `stack`, but the stack's own channel list defaults to `null`, which discards
+everything — so an install that sets neither is silent, and `app:validate` warns
+about exactly that. A real install sets
 `LOG_CHANNEL`/`LOG_STACK` and `LOG_STORAGE_PATH`; `app:validate` is the check
 that it took — it writes a real record at every level rather than reporting that
 the file looks writable.

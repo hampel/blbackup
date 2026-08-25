@@ -17,6 +17,9 @@ rclone.conf
 /builds
 /.box_dump
 
+# Artwork for configuring the Slack channel - nothing at runtime reads it
+/assets
+
 # The image does not need the history, the tests or the editor's opinions
 /.git
 /.idea
