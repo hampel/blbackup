@@ -139,11 +139,12 @@ data never reaches the records.
 
 ## Testing
 
-`tests/Feature/DownloadCommandTest.php` covers the `download` command end to
-end and is the model for testing the rest. The commands' product is the shell
-command they assemble and the file that results, so that is what is asserted:
-`Process::assertRan()` against the exact wget/zstd/rclone command string, and
-the state of the `downloads` disk afterwards.
+`tests/Feature/DownloadCommandTest.php` and `tests/Feature/CreateCommandTest.php`
+cover those two commands end to end and are the model for testing the rest. The
+commands' product is the shell command they assemble, the API call they make and
+the file that results, so that is what is asserted: `Process::assertRan()`
+against the exact wget/zstd/rclone command string, `Http::assertSent()` against
+the request, and the state of the `downloads` disk afterwards.
 
 `tests/Pest.php` pins every binary path, the remote, the timezone and the API
 token in a `beforeEach` chained onto `uses()`, so assertions don't depend on the
@@ -154,10 +155,13 @@ the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /
 `fakeImage()` build API payloads, `fakeApi()` answers every BinaryLane endpoint
 by routing on the request path, `fakeBinaries()` fakes the external commands with
 a fall-through to success, `wgetWrites()` is a wget fake that writes the file
-wget would have written, and `backupPath()` gives the path the command derives
-for the standard fixture.
+wget would have written, `writeServerList()` writes an `--include` / `--exclude`
+list, and `backupPath()` gives the path the command derives for the standard
+fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
+`create` poll loop reads, and an entry may be a closure — which is how a test
+makes something happen between one poll and the next.
 
-Four things that will catch you out:
+Five things that will catch you out:
 
 - **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —
   `beforeEach(...)->in('Feature')` on its own parses fine and silently never
@@ -168,6 +172,14 @@ Four things that will catch you out:
 - **`Http::fake()` honours the `sink` option**, so the `--no-wget` path really
   writes the faked body to disk. That is why the fake `.zst` response body is
   exactly `MEGABYTE` bytes.
+- **`Sleep::fake()` is useless against `create`'s poll loop, and dangerous.**
+  A faked sleep returns before the `while` loop runs, so the poll callback never
+  executes and `$status` stays null. Sleep is therefore real in
+  `CreateCommandTest`, which is only affordable because a poll that ends the loop
+  never sleeps — the callback runs before the first sleep. Every test there has
+  to reach a stopping condition on its first poll, or it costs ten seconds a
+  poll. The timeout test gets there by having the API fake move the clock, since
+  the elapsed-time check cannot otherwise trip.
 - **A download is accepted only if its size in GB exactly equals the API's
   `size_gigabytes`**, so fixture sizes have to be exact in both units. Hence
   `MEGABYTE` / `MEGABYTE_IN_GB` (0.0009765625) rather than a round decimal.

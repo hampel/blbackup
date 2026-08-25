@@ -19,7 +19,7 @@ beforeEach(function () {
  */
 function fakeOneBackup(array $server, array $image, string $url): void
 {
-    fakeApi($server, [$image], fakeLink($image['id'], $url));
+    fakeApi([$server], [$image], fakeLink($image['id'], $url));
 }
 
 function wgetCommand(string $url, string $path): Closure
@@ -50,7 +50,7 @@ it('downloads the newest backup when a server has several', function () {
     $older = fakeImage(['id' => 111, 'created_at' => '2026-08-18T14:30:00Z']);
     $newer = fakeImage(['id' => 222, 'created_at' => '2026-08-20T14:30:00Z']);
 
-    fakeApi($this->server, [$older, $newer], fakeLink(222, $this->url));
+    fakeApi([$this->server], [$older, $newer], fakeLink(222, $this->url));
     fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
 
     $this->artisan('download', ['server' => 'web1.example.com'])

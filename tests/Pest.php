@@ -93,6 +93,18 @@ function fakeImage(array $attributes = []): array
     ], $attributes);
 }
 
+function fakeAction(string $status = 'completed', int $percent = 100, int $id = 900): array
+{
+    return [
+        'id' => $id,
+        'status' => $status,
+        'progress' => [
+            'percent_complete' => $percent,
+            'current_step_detail' => 'Copying disk',
+        ],
+    ];
+}
+
 /**
  * The path the download command derives for an image: the datestamp is the
  * image's created_at in binarylane.timezone, not UTC.
@@ -121,10 +133,17 @@ function putDownload(string $path, int $bytes): void
 /**
  * Answer the BinaryLane endpoints App\Api calls, routing on the request path
  * so one fake covers every command.
+ *
+ * $statuses is the queue of action payloads GET /actions/{id} returns as the
+ * create command polls; the last one is repeated once the queue runs dry. An
+ * entry may be a closure, which is how a test makes something happen between
+ * one poll and the next.
  */
-function fakeApi(array $server, array $backups = [], array $links = []): void
+function fakeApi(array $servers, array $backups = [], array $links = [], array $statuses = []): void
 {
-    Http::fake(function (Request $request) use ($server, $backups, $links) {
+    $statuses = collect($statuses ?: [fakeAction()]);
+
+    Http::fake(function (Request $request) use ($servers, $backups, $links, $statuses) {
         $path = parse_url($request->url(), PHP_URL_PATH);
 
         return match (true) {
@@ -132,14 +151,20 @@ function fakeApi(array $server, array $backups = [], array $links = []): void
             // real file of exactly the size the API below reports
             str_ends_with($path, '.zst') => Http::response(str_repeat('x', MEGABYTE)),
             str_ends_with($path, '/backups') => Http::response(['backups' => $backups]),
+            str_ends_with($path, '/actions') => Http::response(['action' => fakeAction('in-progress', 0)]),
+            (bool) preg_match('#/actions/\d+$#', $path) => Http::response(
+                ['action' => value($statuses->count() > 1 ? $statuses->shift() : $statuses->first())]
+            ),
             (bool) preg_match('#/images/(\d+)/download$#', $path, $matches) => Http::response(
                 ['link' => $links[(int) $matches[1]] ?? null]
             ),
             (bool) preg_match('#/images/(\d+)$#', $path, $matches) => Http::response(
                 ['image' => collect($backups)->firstWhere('id', (int) $matches[1])]
             ),
-            (bool) preg_match('#/servers/\d+$#', $path) => Http::response(['server' => $server]),
-            str_ends_with($path, '/servers') => Http::response(['servers' => [$server]]),
+            (bool) preg_match('#/servers/(\d+)$#', $path, $matches) => Http::response(
+                ['server' => collect($servers)->firstWhere('id', (int) $matches[1])]
+            ),
+            str_ends_with($path, '/servers') => Http::response(['servers' => $servers]),
             default => Http::response(['error' => "unexpected request to {$path}"], 404),
         };
     });
@@ -173,4 +198,15 @@ function wgetWrites(int $bytes): Closure
 
         return Process::result();
     };
+}
+
+/**
+ * Write a server list of the kind create's --include / --exclude take, and
+ * return the absolute path to it.
+ */
+function writeServerList(string $name, array $servers): string
+{
+    Storage::disk('downloads')->put($name, implode(PHP_EOL, $servers));
+
+    return downloadPath($name);
 }
