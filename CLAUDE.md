@@ -67,6 +67,16 @@ code calls `$this->api->…` straight, with no try/catch. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
 
+**Exit codes are the contract with cron**, and the commands are not uniform
+about them. `check` and `move` collect their per-file failures with `reject()`
+so one bad file doesn't stop the run, then report at the end — a single-file
+run fails if that file failed, an `--all` run fails if any did. `download`
+propagates the exit code of the `move` it calls. `create` does not: an errored
+or timed-out backup is logged, but the command still exits SUCCESS, and so does
+`clean` when an individual remote `deletefile` fails (the `return self::FAILURE`
+inside its `each()` closure returns from the closure, not the command). Worth
+knowing before trusting a green cron run.
+
 **`log($level, $message, $logMessage = null, $context = [])`** dual-writes: to
 Monolog (structured, with `$context`) and to the console (styled, gated by a
 level→verbosity map, so `debug` only appears under `-vvv`). Use it rather than

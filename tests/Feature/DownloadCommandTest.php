@@ -174,6 +174,19 @@ it('reports success when a specific image is downloaded and moved', function () 
     Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'moveto'));
 });
 
+it('reports failure when the move after a download fails', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries([
+        '*wget*' => wgetWrites(MEGABYTE),
+        '*lsjson*' => Process::result(errorOutput: 'directory not found', exitCode: 3),
+        '*moveto*' => Process::result(errorOutput: 'Failed to copy: quota exceeded', exitCode: 1),
+    ]);
+
+    $this->artisan('download', ['--image' => 12345, '--move' => true])
+        ->expectsOutputToContain('Could not move file to secondary storage')
+        ->assertFailed();
+});
+
 it('does not download an image already shipped to the remote', function () {
     fakeOneBackup($this->server, $this->image, $this->url);
     fakeBinaries([

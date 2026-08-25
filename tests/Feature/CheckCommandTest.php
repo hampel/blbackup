@@ -76,9 +76,11 @@ it('carries on to the next file after one fails --all', function () {
 
     $this->artisan('check', ['--all' => true])
         ->expectsOutputToContain('failed zstd test')
-        ->assertSuccessful();
+        ->expectsOutputToContain('1 backup file(s) failed the zstd test')
+        ->assertFailed();
 
-    // the failure must not stop the run - the second file is still tested
+    // the failure must not stop the run - the second file is still tested,
+    // and the exit code still reports that something was wrong
     Process::assertRan(zstdTested(downloadPath($second)));
 
     // both files are left in place; check never deletes

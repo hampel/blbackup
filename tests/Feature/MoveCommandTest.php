@@ -132,5 +132,22 @@ it('reports a failed transfer', function () {
 
     $this->artisan('move', ['file' => $this->path])
         ->expectsOutputToContain('Could not move file to secondary storage: Failed to copy: quota exceeded')
-        ->assertSuccessful();
+        ->assertFailed();
+});
+
+it('fails when one of several files cannot be moved', function () {
+    $second = backupPath('db1.example.com', 'db1', image: 222);
+    putDownload($this->path, MEGABYTE);
+    putDownload($second, MEGABYTE);
+
+    fakeBinaries([
+        '*'.basename($this->path).'*' => Process::result(errorOutput: 'Failed to copy: quota exceeded', exitCode: 1),
+    ]);
+
+    $this->artisan('move', ['--all' => true])
+        ->expectsOutputToContain('1 backup file(s) could not be moved')
+        ->assertFailed();
+
+    // the failure must not stop the run - the second file is still attempted
+    Process::assertRan(movedTo(downloadPath($second), "remote:backups/{$second}"));
 });

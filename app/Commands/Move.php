@@ -69,7 +69,7 @@ class Move extends BaseCommand
 
         if ($this->option('all'))
         {
-            collect(Storage::disk('downloads')->allFiles(''))
+            $failed = collect(Storage::disk('downloads')->allFiles(''))
                 ->tap(function (Collection $collection) {
                     if ($collection->count() === 0)
                     {
@@ -80,16 +80,28 @@ class Move extends BaseCommand
                         $this->line("The following files would be moved from downloads to remote:");
                     }
                 })
-                ->each(function ($path) use ($remote) {
-                    $this->moveFile($remote, $path);
+                // reject rather than each, so every file is still attempted and
+                // what is left is the ones that failed
+                ->reject(function ($path) use ($remote) {
+                    return $this->moveFile($remote, $path);
                 });
-        }
-        else
-        {
-            $this->moveFile($remote, $file);
+
+            if ($failed->isNotEmpty())
+            {
+                $this->log(
+                    'error',
+                    "{$failed->count()} backup file(s) could not be moved to secondary storage",
+                    "Backup files could not be moved to secondary storage",
+                    ['count' => $failed->count(), 'files' => $failed->values()->all()]
+                );
+
+                return self::FAILURE;
+            }
+
+            return self::SUCCESS;
         }
 
-        return self::SUCCESS;
+        return $this->moveFile($remote, $file) ? self::SUCCESS : self::FAILURE;
     }
 
     protected function moveFile(string $remote, string $path) : bool

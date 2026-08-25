@@ -55,7 +55,7 @@ class Check extends BaseCommand
 
         if ($this->option('all'))
         {
-            collect(Storage::disk('downloads')->allFiles(''))
+            $failed = collect(Storage::disk('downloads')->allFiles(''))
                 ->tap(function (Collection $collection) {
                     if ($collection->count() === 0)
                     {
@@ -66,16 +66,28 @@ class Check extends BaseCommand
                         $this->line("The following files would be checked in downloads:");
                     }
                 })
-                ->each(function ($path) {
-                    $this->checkFile($path);
+                // reject rather than each, so every file is still checked and
+                // what is left is the ones that failed
+                ->reject(function ($path) {
+                    return $this->checkFile($path);
                 });
-        }
-        else
-        {
-            return $this->checkFile($file) ? self::SUCCESS : self::FAILURE;
+
+            if ($failed->isNotEmpty())
+            {
+                $this->log(
+                    'error',
+                    "{$failed->count()} backup file(s) failed the zstd test",
+                    "Backup files failed the zstd test",
+                    ['count' => $failed->count(), 'files' => $failed->values()->all()]
+                );
+
+                return self::FAILURE;
+            }
+
+            return self::SUCCESS;
         }
 
-        return self::SUCCESS;
+        return $this->checkFile($file) ? self::SUCCESS : self::FAILURE;
     }
 
     protected function checkFile(string $path) : bool
