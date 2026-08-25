@@ -139,9 +139,8 @@ data never reaches the records.
 
 ## Testing
 
-`tests/Feature/DownloadCommandTest.php` and `tests/Feature/CreateCommandTest.php`
-cover those two commands end to end and are the model for testing the rest. The
-commands' product is the shell command they assemble, the API call they make and
+`tests/Feature/` covers `create`, `download`, `check`, `move` and `clean` end to
+end — everything but the read-only listing commands. The commands' product is the shell command they assemble, the API call they make and
 the file that results, so that is what is asserted: `Process::assertRan()`
 against the exact wget/zstd/rclone command string, `Http::assertSent()` against
 the request, and the state of the `downloads` disk afterwards.
@@ -156,12 +155,13 @@ the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /
 by routing on the request path, `fakeBinaries()` fakes the external commands with
 a fall-through to success, `wgetWrites()` is a wget fake that writes the file
 wget would have written, `writeServerList()` writes an `--include` / `--exclude`
-list, and `backupPath()` gives the path the command derives for the standard
-fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
+list, `putAgedDownload()` writes a backup with a modification time for `clean`
+to expire, `rcloneEntry()` / `rcloneListing()` build `rclone lsjson` output, and
+`backupPath()` gives the path the command derives for the standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
 `create` poll loop reads, and an entry may be a closure — which is how a test
 makes something happen between one poll and the next.
 
-Five things that will catch you out:
+Six things that will catch you out:
 
 - **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —
   `beforeEach(...)->in('Feature')` on its own parses fine and silently never
@@ -180,6 +180,11 @@ Five things that will catch you out:
   to reach a stopping condition on its first poll, or it costs ten seconds a
   poll. The timeout test gets there by having the API fake move the clock, since
   the elapsed-time check cannot otherwise trip.
+- **`rclone lsjson` emits RFC3339 with nanosecond precision** — and `Z` rather
+  than an offset on some backends. `rcloneEntry()` mirrors what the rclone on
+  this machine really prints, which is the point: a fixture in a tidier format
+  would have passed against a parse that crashes on live output, which is
+  exactly the bug these tests found.
 - **A download is accepted only if its size in GB exactly equals the API's
   `size_gigabytes`**, so fixture sizes have to be exact in both units. Hence
   `MEGABYTE` / `MEGABYTE_IN_GB` (0.0009765625) rather than a round decimal.

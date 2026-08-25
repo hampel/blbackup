@@ -210,3 +210,34 @@ function writeServerList(string $name, array $servers): string
 
     return downloadPath($name);
 }
+
+/**
+ * A downloaded backup with a modification time, which is what clean expires on.
+ */
+function putAgedDownload(string $path, int $daysAgo, int $bytes = MEGABYTE): void
+{
+    putDownload($path, $bytes);
+
+    touch(downloadPath($path), now()->subDays($daysAgo)->timestamp);
+}
+
+/**
+ * One entry of `rclone lsjson -R` output. ModTime is RFC3339 with nanosecond
+ * precision, which is what rclone really emits - checked against the rclone on
+ * this machine, not invented.
+ */
+function rcloneEntry(string $path, int $daysAgo = 0, bool $isDir = false, int $bytes = MEGABYTE): array
+{
+    return [
+        'Path' => $path,
+        'Name' => basename($path),
+        'Size' => $isDir ? -1 : $bytes,
+        'ModTime' => now()->subDays($daysAgo)->format('Y-m-d\TH:i:s.u000P'),
+        'IsDir' => $isDir,
+    ];
+}
+
+function rcloneListing(array $entries): string
+{
+    return json_encode($entries);
+}

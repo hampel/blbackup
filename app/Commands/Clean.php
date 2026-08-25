@@ -137,9 +137,11 @@ class Clean extends BaseCommand
 
             collect($files)
                 ->reject(function ($file) use ($cutoff) {
-                    $modTime = Carbon::createFromFormat("Y-m-d\TH:i:s.vP", $file['ModTime'])->timestamp;
-
-                    return $file['IsDir'] || $modTime > $cutoff;
+                    // rclone emits RFC3339 with nanosecond precision, and some
+                    // backends use Z rather than an offset - too variable for a
+                    // fixed format string, which threw rather than failing the
+                    // command. Directories are rejected before parsing at all.
+                    return $file['IsDir'] || Carbon::parse($file['ModTime'])->timestamp > $cutoff;
                 })
                 ->tap(function (Collection $collection) {
                     if ($collection->count() === 0)
