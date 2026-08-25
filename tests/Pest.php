@@ -149,6 +149,10 @@ function putDownload(string $path, int $bytes): void
  */
 function fakeApi(array $servers, array $backups = [], array $links = [], array $statuses = [], array $account = []): void
 {
+    // Http::fake() merges stubs and the first match wins, so a second call
+    // would be shadowed by the first. Start from a clean factory instead.
+    Http::swap(new Illuminate\Http\Client\Factory);
+
     $statuses = collect($statuses ?: [fakeAction()]);
     $account = $account ?: fakeAccount();
 
@@ -192,6 +196,10 @@ function fakeLink(int $image, string $url): array
  */
 function fakeBinaries(array $handlers = []): void
 {
+    // Process::fake() merges handlers the same way Http::fake() merges stubs,
+    // so the catch-all below would shadow anything a later call registered.
+    Process::swap(new Illuminate\Process\Factory);
+
     Process::fake(array_merge($handlers, ['*' => Process::result()]));
 }
 
