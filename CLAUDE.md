@@ -71,14 +71,19 @@ every record from a run is tagged with the command.
 a list uses the same shape: `reject()` rather than `each()`, so one failure
 doesn't stop the run and what is left is what failed, then a count logged and
 FAILURE returned at the end. `create` reports servers whose backup errored or
-timed out; `check`, `move` and `clean` report the files they could not handle;
-`download` propagates the exit code of the `move` it calls. Copy that shape for
+timed out; `download` reports the servers whose backup is not in place;
+`check`, `move` and `clean` report the files they could not handle. The chain
+propagates too: `download` returns the exit code of the `move` it calls, and
+`create --download` returns the exit code of the `download`. Copy that shape for
 anything new — a `return` inside an `each()` closure returns from the closure,
 not the command, which is how `clean`'s remote deletions used to fail silently.
 
-The exception left is `download` itself: a per-image failure under a hostname or
-`--all` (a bad size, a failed wget) is logged, but `handle()` still returns
-SUCCESS. Only the `--image` form propagates it.
+**A skip is not a failure**, and `download` is where that distinction lives.
+`downloadImage()` returns whether the backup is *in place afterwards* — true
+when it downloaded one and true when one was already there, local or on the
+remote; false only when something went wrong. Return false for the
+already-downloaded case and a re-run of `download --all` reports trouble every
+night, which is the failure mode that makes an exit code worth nothing.
 
 **`log($level, $message, $logMessage = null, $context = [])`** dual-writes: to
 Monolog (structured, with `$context`) and to the console (styled, gated by a

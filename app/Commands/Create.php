@@ -127,7 +127,10 @@ class Create extends BaseCommand
 
                 if ($this->option('download'))
                 {
-                    $this->call('download', ['server' => $server['id'], '--move' => $this->option('move')]);
+                    return $this->call('download', [
+                        'server' => $server['id'],
+                        '--move' => $this->option('move'),
+                    ]) === self::SUCCESS;
                 }
 
                 return true;

@@ -134,14 +134,16 @@ class Download extends BaseCommand
             $excludeServers = array_filter(explode(PHP_EOL, File::get($exclude)));
         }
 
-        collect($servers)
+        $failed = collect($servers)
             ->filter(function ($server) use ($includeServers) {
                 return $includeServers ? in_array($server['name'], $includeServers) : true;
             })
             ->reject(function ($server) use ($excludeServers) {
                 return $excludeServers ? in_array($server['name'], $excludeServers) : false;
             })
-            ->each(function ($server) {
+            // reject rather than each, so one server that fails doesn't stop the
+            // run and what is left is the servers with no backup in place
+            ->reject(function ($server) {
 
                 $backups = $this->api->backups($server);
 
@@ -154,7 +156,7 @@ class Download extends BaseCommand
                         ['server' => $server['name']]
                     );
 
-                    return;
+                    return false;
                 }
 
                 $image = collect($backups)->sortBy('created_at')->last();
@@ -171,15 +173,33 @@ class Download extends BaseCommand
                         ['image_id' => $imageId, 'server' => $server['name']]
                     );
 
-                    return;
+                    return false;
                 }
 
-                $this->downloadImage($image, $server, $link);
+                return $this->downloadImage($image, $server, $link);
             });
+
+        if ($failed->isNotEmpty())
+        {
+            $this->log(
+                'error',
+                "{$failed->count()} backup(s) could not be downloaded",
+                "Backups could not be downloaded",
+                ['count' => $failed->count(), 'servers' => $failed->pluck('name')->all()]
+            );
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }
 
+    /**
+     * Returns whether the backup is in place afterwards - true when it was
+     * downloaded and true when it was already there, false only when something
+     * went wrong. Callers use it for the exit code, so a skip must not read as
+     * a failure.
+     */
     protected function downloadImage(array $image, array $server, array $link) : bool
     {
         $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])
@@ -224,7 +244,8 @@ class Download extends BaseCommand
                         ['server' => $server['name'], 'path' => $path]
                     );
 
-                    return false;
+                    // nothing to do, and nothing wrong: the backup is here
+                    return true;
                 }
 
                 // file already exists, but size doesn't match expected - incomplete download?
@@ -259,7 +280,8 @@ class Download extends BaseCommand
                             ['server' => $server['name'], 'path' => $path]
                         );
 
-                        return false;
+                        // nothing to do, and nothing wrong: the backup is shipped
+                        return true;
                     }
 
                     // file already exists, but size doesn't match expected - incomplete download?

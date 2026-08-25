@@ -202,3 +202,14 @@ it('backs up the rest of the servers after one fails, then reports failure', fun
     // the failure must not stop the run - the second server is still backed up
     Http::assertSent(backupWasRequestedFor(200));
 });
+
+it('reports failure when a backup is taken but the download fails', function () {
+    fakeApi([$this->server], [fakeImage()], fakeLink(12345, 'https://images.binarylane.com.au/backup-12345.zst'));
+    fakeBinaries(['*wget*' => Process::result(errorOutput: 'wget: unable to resolve host', exitCode: 4)]);
+
+    $this->artisan('create', ['server' => 'web1.example.com', '--download' => true])
+        ->expectsOutputToContain('Completed server backup web1.example.com')
+        ->expectsOutputToContain('Could not download file')
+        ->expectsOutputToContain('1 server backup(s) did not complete')
+        ->assertFailed();
+});

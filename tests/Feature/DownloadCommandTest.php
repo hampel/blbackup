@@ -88,7 +88,8 @@ it('does not overwrite a short file, which may be an interrupted download', func
 
     $this->artisan('download', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('does not match expected')
-        ->assertSuccessful();
+        ->expectsOutputToContain('1 backup(s) could not be downloaded')
+        ->assertFailed();
 
     Process::assertNothingRan();
 
@@ -118,7 +119,7 @@ it('deletes a download that fails the zstd check', function () {
     $this->artisan('download', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('failed zstd test')
         ->expectsOutputToContain('Deleting invalid backup file')
-        ->assertSuccessful();
+        ->assertFailed();
 
     expect(Storage::disk('downloads')->exists($this->path))->toBeFalse();
 });
@@ -129,7 +130,7 @@ it('reports a download whose size does not match the API', function () {
 
     $this->artisan('download', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('does not match expected')
-        ->assertSuccessful();
+        ->assertFailed();
 
     Process::assertRan(zstdCommand(downloadPath($this->path)));
 });
@@ -140,7 +141,7 @@ it('skips the download when wget fails', function () {
 
     $this->artisan('download', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('Could not download file')
-        ->assertSuccessful();
+        ->assertFailed();
 
     Process::assertNotRan(zstdCommand(downloadPath($this->path)));
 });
@@ -219,4 +220,36 @@ it('lists the available backups when given nothing to download', function () {
     $this->artisan('download')
         ->expectsOutputToContain('Specify a hostname, server_id or backup_id')
         ->assertFailed();
+});
+
+it('reports success when the backup is already downloaded', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    // nothing to do is not a failure - otherwise re-running a completed
+    // download --all would report trouble every time
+    $this->artisan('download', ['--image' => 12345])
+        ->expectsOutputToContain('already exists')
+        ->assertSuccessful();
+
+    Process::assertNothingRan();
+});
+
+it('downloads the other servers after one fails, then reports failure', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+
+    fakeBinaries([
+        '*db1.example.com*' => Process::result(errorOutput: 'wget: unable to resolve host', exitCode: 4),
+        '*wget*' => wgetWrites(MEGABYTE),
+    ]);
+
+    $this->artisan('download', ['--all' => true])
+        ->expectsOutputToContain('Could not download file')
+        ->expectsOutputToContain('1 backup(s) could not be downloaded')
+        ->assertFailed();
+
+    // the failure must not stop the run - the other server is still downloaded
+    expect(Storage::disk('downloads')->exists($this->path))->toBeTrue();
 });
