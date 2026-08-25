@@ -157,8 +157,8 @@ data never reaches the records.
 
 ## Testing
 
-`tests/Feature/` covers `create`, `download`, `check`, `move` and `clean` end to
-end — everything but the read-only listing commands. The commands' product is the shell command they assemble, the API call they make and
+`tests/Feature/` covers every command — `create`, `download`, `check`, `move`,
+`clean`, and the read-only `servers`, `backups` and `account`. The commands' product is the shell command they assemble, the API call they make and
 the file that results, so that is what is asserted: `Process::assertRan()`
 against the exact wget/zstd/rclone command string, `Http::assertSent()` against
 the request, and the state of the `downloads` disk afterwards.
@@ -179,7 +179,7 @@ to expire, `rcloneEntry()` / `rcloneListing()` build `rclone lsjson` output, and
 `create` poll loop reads, and an entry may be a closure — which is how a test
 makes something happen between one poll and the next.
 
-Six things that will catch you out:
+Eight things that will catch you out:
 
 - **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —
   `beforeEach(...)->in('Feature')` on its own parses fine and silently never
@@ -190,6 +190,15 @@ Six things that will catch you out:
 - **`Http::fake()` honours the `sink` option**, so the `--no-wget` path really
   writes the faked body to disk. That is why the fake `.zst` response body is
   exactly `MEGABYTE` bytes.
+- **`expectsTable()` cannot see extra rows.** It renders the rows you give it
+  and asserts each resulting line appears in the output, so a command listing
+  rows it should have filtered out still passes. Assert the exclusions with
+  `doesntExpectOutputToContain()` — a mutation that deleted `backups`' public /
+  non-backup filter passed a table assertion until that was added.
+- **`expectsOutputToContain()` consumes one expectation per line**, so two of
+  them cannot both match the same line. Two values on one table row need a
+  single `expectsTable()` row instead — which is why the timezone test asserts a
+  row rather than two timestamps.
 - **`Sleep::fake()` is useless against `create`'s poll loop, and dangerous.**
   A faked sleep returns before the `while` loop runs, so the poll callback never
   executes and `$status` stays null. Sleep is therefore real in

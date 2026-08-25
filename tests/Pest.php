@@ -93,6 +93,14 @@ function fakeImage(array $attributes = []): array
     ], $attributes);
 }
 
+function fakeAccount(array $attributes = []): array
+{
+    return array_merge([
+        'email' => 'backups@example.com',
+        'status' => 'active',
+    ], $attributes);
+}
+
 function fakeAction(string $status = 'completed', int $percent = 100, int $id = 900): array
 {
     return [
@@ -139,11 +147,12 @@ function putDownload(string $path, int $bytes): void
  * entry may be a closure, which is how a test makes something happen between
  * one poll and the next.
  */
-function fakeApi(array $servers, array $backups = [], array $links = [], array $statuses = []): void
+function fakeApi(array $servers, array $backups = [], array $links = [], array $statuses = [], array $account = []): void
 {
     $statuses = collect($statuses ?: [fakeAction()]);
+    $account = $account ?: fakeAccount();
 
-    Http::fake(function (Request $request) use ($servers, $backups, $links, $statuses) {
+    Http::fake(function (Request $request) use ($servers, $backups, $links, $statuses, $account) {
         $path = parse_url($request->url(), PHP_URL_PATH);
 
         return match (true) {
@@ -151,6 +160,8 @@ function fakeApi(array $servers, array $backups = [], array $links = [], array $
             // real file of exactly the size the API below reports
             str_ends_with($path, '.zst') => Http::response(str_repeat('x', MEGABYTE)),
             str_ends_with($path, '/backups') => Http::response(['backups' => $backups]),
+            str_ends_with($path, '/account') => Http::response(['account' => $account]),
+            str_ends_with($path, '/images') => Http::response(['images' => $backups]),
             str_ends_with($path, '/actions') => Http::response(['action' => fakeAction('in-progress', 0)]),
             (bool) preg_match('#/actions/\d+$#', $path) => Http::response(
                 ['action' => value($statuses->count() > 1 ? $statuses->shift() : $statuses->first())]
