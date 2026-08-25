@@ -135,7 +135,7 @@ class Clean extends BaseCommand
 
             $verbosity = $this->getVerbosity();
 
-            collect($files)
+            $failed = collect($files)
                 ->reject(function ($file) use ($cutoff) {
                     // rclone emits RFC3339 with nanosecond precision, and some
                     // backends use Z rather than an offset - too variable for a
@@ -153,45 +153,61 @@ class Clean extends BaseCommand
                         $this->line("The following files would be deleted from remote filesystem:");
                     }
                 })
-                ->each(function ($file) use ($rclone, $remotePath, $verbosity) {
+                // reject rather than each, so one failed deletion doesn't stop
+                // the run and what is left is the files still on the remote.
+                // A return from inside each() only returns from the closure.
+                ->reject(function ($file) use ($rclone, $remotePath, $verbosity) {
 
                     $path = $file['Path'];
 
                     if ($this->option('dry-run'))
                     {
                         $this->line($path);
+
+                        return true;
                     }
-                    else
+
+                    $this->log(
+                        'notice',
+                        "Deleting old backup file from remote filesystem [{$path}]",
+                        "Deleting old backup file from remote filesystem",
+                        compact('path')
+                    );
+
+                    $cmd = "{$rclone}{$verbosity} deletefile {$remotePath}/{$path}";
+
+                    $this->logCmd('rclone deletefile', $cmd);
+
+                    $result = Process::path(storage_path())->run($cmd);
+
+                    if ($result->failed())
                     {
+                        $output = trim($result->errorOutput());
+
                         $this->log(
-                            'notice',
-                            "Deleting old backup file from remote filesystem [{$path}]",
-                            "Deleting old backup file from remote filesystem",
-                            compact('path')
+                            'error',
+                            "Could not delete old backup file from remote filesystem: " . $output,
+                            "Could not delete old backup file from remote filesystem",
+                            compact('path', 'output')
                         );
 
-                        $cmd = "{$rclone}{$verbosity} deletefile {$remotePath}/{$path}";
-
-                        $this->logCmd('rclone deletefile', $cmd);
-
-                        $result = Process::path(storage_path())->run($cmd);
-
-                        if ($result->failed())
-                        {
-                            $output = trim($result->errorOutput());
-
-                            $this->log(
-                                'error',
-                                "Could not delete old backup file from remote filesystem: " . $output,
-                                "Could not delete old backup file from remote filesystem",
-                                compact('output')
-                            );
-
-                            return self::FAILURE;
-                        }
+                        return false;
                     }
 
+                    return true;
                 });
+
+            if ($failed->isNotEmpty())
+            {
+                $this->log(
+                    'error',
+                    "{$failed->count()} old backup file(s) could not be deleted from the remote filesystem",
+                    "Old backup files could not be deleted from the remote filesystem",
+                    ['count' => $failed->count(), 'files' => $failed->pluck('Path')->all()]
+                );
+
+                return self::FAILURE;
+            }
         }
 
         return self::SUCCESS;

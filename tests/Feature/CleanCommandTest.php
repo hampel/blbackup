@@ -128,6 +128,27 @@ it('says there is nothing to delete from the remote', function () {
         ->assertSuccessful();
 });
 
+it('fails when a remote file cannot be deleted, having tried the rest', function () {
+    $second = backupPath(date: '20260802-003000', image: 333);
+
+    fakeBinaries([
+        '*lsjson*' => Process::result(output: rcloneListing([
+            rcloneEntry($this->old, daysAgo: 30),
+            rcloneEntry($second, daysAgo: 30),
+        ])),
+        '*'.basename($this->old) => Process::result(errorOutput: 'permission denied', exitCode: 1),
+    ]);
+
+    $this->artisan('clean', ['--remote' => true])
+        ->expectsConfirmation(CONFIRMATION, 'yes')
+        ->expectsOutputToContain('Could not delete old backup file from remote filesystem: permission denied')
+        ->expectsOutputToContain('1 old backup file(s) could not be deleted')
+        ->assertFailed();
+
+    // the failure must not stop the run - the second file is still deleted
+    Process::assertRan(deletedFromRemote($second));
+});
+
 it('fails when the remote listing cannot be read', function () {
     fakeBinaries(['*lsjson*' => Process::result(errorOutput: 'directory not found', exitCode: 3)]);
 
