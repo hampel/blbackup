@@ -1,11 +1,33 @@
 <?php
 
+use App\Logging\StampHostname;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
+// named once, because the slack channel labels its posts with it as well
+$hostname = env('LOG_HOSTNAME', gethostname());
+
 return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Log Hostname
+    |--------------------------------------------------------------------------
+    |
+    | What this machine calls itself in the logs, stamped onto every record by the
+    | channels tapped with StampHostname below. A Slack channel that says which
+    | host it is reporting on can serve every installation from one webhook,
+    | instead of one webhook per machine to tell them apart.
+    |
+    | This runs in a container, which calls itself a hex string that changes with
+    | every image rebuild - so setting LOG_HOSTNAME is worth doing even with one
+    | installation. Set it to an empty value to leave records unstamped.
+    |
+    */
+
+    'hostname' => $hostname,
 
     /*
     |--------------------------------------------------------------------------
@@ -63,6 +85,7 @@ return [
             'path' => env('LOG_STORAGE_PATH', storage_path('blbackup.log')),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'tap' => [StampHostname::class],
         ],
 
         'daily' => [
@@ -71,15 +94,19 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'tap' => [StampHostname::class],
         ],
 
+        // the username also lands in the footer of the Slack attachment, which is
+        // shown whether or not the webhook is allowed to override the posting name
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
-            'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
+            'username' => env('LOG_SLACK_USERNAME', $hostname ?: 'blbackup'),
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
             'level' => env('LOG_SLACK_LEVEL', 'critical'),
             'replace_placeholders' => true,
+            'tap' => [StampHostname::class],
         ],
 
         'papertrail' => [

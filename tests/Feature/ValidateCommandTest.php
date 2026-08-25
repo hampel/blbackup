@@ -118,8 +118,17 @@ it('warns but does not fail when nothing is logged anywhere', function () {
     [$exit, $output] = validate();
 
     expect($exit)->toBe(0)
-        ->and($output)->toContain('[warn] Log channel')
-        ->toContain('nothing is recorded anywhere');
+        ->and($output)->toContain('[warn] log channel')
+        ->toContain('discards everything');
+});
+
+it('warns when the stack contains only the null channel', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'stack', 'logging.channels.stack.channels' => ['null']]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('[warn] log channel')->toContain('LOG_STACK');
 });
 
 it('checks the log file is writable', function () {
@@ -128,7 +137,7 @@ it('checks the log file is writable', function () {
 
     [$exit, $output] = validate();
 
-    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] Log file (single)');
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] log path (single)');
 });
 
 it('fails when the log file cannot be written', function () {
@@ -138,7 +147,7 @@ it('fails when the log file cannot be written', function () {
     [$exit, $output] = validate();
 
     expect($exit)->toBe(1)
-        ->and($output)->toContain('[fail] Log file (single)')
+        ->and($output)->toContain('[fail] log path (single)')
         ->toContain('is not writable');
 });
 
@@ -198,12 +207,12 @@ it('never prints the api token or the slack webhook', function () {
     [$exit, $output] = validate();
 
     expect($exit)->toBe(0)
-        ->and($output)->toContain('[ ok ] Slack webhook')
+        ->and($output)->toContain('[ ok ] slack webhook')
         ->not->toContain('SECRET/WEBHOOK/VALUE')
         ->not->toContain('test-token');
 });
 
-it('writes a record through the configured channel, not just checking it is writable', function () {
+it('writes a record at every level on every run', function () {
     fakeApi([fakeServer()]);
     config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
 
@@ -211,25 +220,62 @@ it('writes a record through the configured channel, not just checking it is writ
 
     [$exit, $output] = validate();
 
-    expect($exit)->toBe(0)->and($output)->toContain('one info record written');
+    expect($exit)->toBe(0)->and($output)->toContain('a message was written at every level');
 
-    Log::shouldHaveReceived('log')->with('info', 'app:validate test record', ['level' => 'info']);
-});
-
-it('writes one record at every level with --logs', function () {
-    fakeApi([fakeServer()]);
-    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
-
-    Log::spy();
-
-    [$exit, $output] = validate(['--logs' => true]);
-
-    expect($exit)->toBe(0)->and($output)->toContain('8 records written, one at every level');
-
+    // not behind a flag: a Slack channel at critical only proves it works when
+    // something at that level is really sent
     foreach (['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'] as $level)
     {
-        Log::shouldHaveReceived('log')->with($level, 'app:validate test record', ['level' => $level]);
+        Log::shouldHaveReceived('log')->with($level, "Validation test message [{$level}]");
     }
+});
+
+it('reports the hostname records are stamped with', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.hostname' => 'unraid']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] log hostname')->toContain('unraid');
+});
+
+it('reports unstamped records as a skip rather than a pass', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.hostname' => null]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[    ] log hostname')
+        ->toContain('set LOG_HOSTNAME')
+        ->not->toContain('[ ok ] log hostname');
+});
+
+it('stamps records with the hostname', function () {
+    $logger = new Monolog\Logger('test');
+    config(['logging.hostname' => 'unraid']);
+
+    (new App\Logging\StampHostname)(new Illuminate\Log\Logger($logger));
+
+    $record = new Monolog\LogRecord(
+        new DateTimeImmutable, 'test', Monolog\Level::Error, 'a message'
+    );
+
+    foreach ($logger->getProcessors() as $processor)
+    {
+        $record = $processor($record);
+    }
+
+    expect($record->extra)->toBe(['hostname' => 'unraid']);
+});
+
+it('leaves records unstamped when no hostname is configured', function () {
+    $logger = new Monolog\Logger('test');
+    config(['logging.hostname' => '']);
+
+    (new App\Logging\StampHostname)(new Illuminate\Log\Logger($logger));
+
+    expect($logger->getProcessors())->toBe([]);
 });
 
 it('does not try to write records when the destination is unwritable', function () {
@@ -239,8 +285,8 @@ it('does not try to write records when the destination is unwritable', function 
     [$exit, $output] = validate();
 
     expect($exit)->toBe(1)
-        ->and($output)->toContain('[fail] Log file (single)')
-        ->toContain('[    ] Log records')
+        ->and($output)->toContain('[fail] log path (single)')
+        ->toContain('[    ] log records')
         ->toContain('cannot be written');
 });
 

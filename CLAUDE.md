@@ -17,8 +17,7 @@ this app.
 ```bash
 php blbackup                     # default: summary list of all commands
 php blbackup app:config          # resolved config (timeouts, binaries, remote, disks, logging)
-php blbackup app:validate        # run the binaries, list the remote, call the API, write a log record
-php blbackup app:validate --logs # also write one record at every level
+php blbackup app:validate        # run the binaries, list the remote, call the API, write logs at every level
 php blbackup app:validate --download=<url>  # also pull a real URL through the download path
 
 php blbackup account             # BinaryLane account info — cheapest API token check
@@ -185,10 +184,22 @@ and the default download path relative to the working directory.
 
 **Logging is off by default** — `logging.default` is `null`. A real install sets
 `LOG_CHANNEL`/`LOG_STACK` and `LOG_STORAGE_PATH`; `app:validate` is the check
-that it took — it writes a real record through the configured channel rather
-than reporting that the file looks writable, and `--logs` writes one at every
-level, which is how you see what a destination with a threshold (Slack at
-`critical`) actually receives. `ContextLogProcessor` is bound explicitly in `AppServiceProvider`
+that it took — it writes a real record at every level rather than reporting that
+the file looks writable.
+
+**`app:validate` posts to Slack**, if a webhook is configured. That is
+deliberate and is why the levels are not behind a flag: a destination with a
+threshold only proves it works when something at that level is really sent, and
+a revoked webhook is invisible from the sending end — the alert simply never
+arrives, which looks exactly like a run where nothing went wrong. Say so before
+anyone runs it on a machine whose Slack channel other people watch.
+
+`config/logging.php` stamps every record with `logging.hostname` through the
+`StampHostname` tap, so one webhook can serve more than one installation. It has
+to be a tap: the `processors` key in a channel's config is only read by the
+`monolog` driver, so `single`, `daily` and `slack` ignore it. Setting
+`LOG_HOSTNAME` matters more here than on a normal box — a container calls itself
+a hex string that changes every time the image is rebuilt. `ContextLogProcessor` is bound explicitly in `AppServiceProvider`
 because Laravel Zero does not register it, and without it `Log::withContext()`
 data never reaches the records.
 

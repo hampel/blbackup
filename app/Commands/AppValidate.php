@@ -19,7 +19,6 @@ class AppValidate extends BaseCommand
      */
     protected $signature = 'app:validate
                             {--no-api : skip the checks that call the BinaryLane API}
-                            {--logs : write a record at every level, to see what each destination really receives}
                             {--d|download= : download this URL to the download path, to exercise the transfer end to end}';
 
     /**
@@ -144,71 +143,52 @@ class AppValidate extends BaseCommand
         }
     }
 
+    /**
+     * The same shape as wback's, so the two tools report their logging alike.
+     *
+     * Records are written at every level on every run, not behind a flag: a
+     * destination with a threshold - Slack at critical - only proves it works
+     * when something at that level is actually sent, and a webhook that has
+     * been revoked says nothing about it at this end. The run posts.
+     */
     protected function checkLogging() : void
     {
         $channel = config('logging.default');
+        $stack = $channel === 'stack' ? implode(',', config('logging.channels.stack.channels', [])) : null;
 
-        if ($channel === 'null')
+        if ($channel === 'null' || $stack === 'null')
         {
-            $this->reportWarn("Log channel", "null - nothing is recorded anywhere");
+            $this->reportWarn('log channel', 'the null channel discards everything - set LOG_CHANNEL or LOG_STACK');
+
+            $this->loggingStopped = true;
 
             return;
         }
 
-        $this->reportOk("Log channel", $channel);
+        $this->reportOk('log channel', $channel);
 
-        $channels = $channel === 'stack'
-            ? config('logging.channels.stack.channels', [])
-            : [$channel];
+        if ($stack !== null)
+        {
+            $this->reportOk('log stack', $stack);
+        }
+
+        $channels = $channel === 'stack' ? config('logging.channels.stack.channels', []) : [$channel];
 
         foreach ($channels as $name)
         {
             $this->checkLogChannel(trim($name));
         }
 
-        $this->checkLogRecords();
-    }
+        // worth reading back on a new installation: it is what tells one machine's
+        // alerts from another's when they all report to the same place, and in a
+        // container the default is a hex string that changes on every rebuild
+        $hostname = config('logging.hostname');
 
-    /**
-     * Write real records through the configured channel.
-     *
-     * Checking the file is writable describes the logging; writing to it
-     * exercises it, which is the difference between this command and
-     * app:config. --logs writes one at every level, which is how you see what a
-     * destination with a threshold - Slack at critical, say - actually receives.
-     */
-    protected function checkLogRecords() : void
-    {
-        if ($this->loggingStopped)
-        {
-            $this->reportSkip("Log records", "not written - the destination above cannot be written");
+        $hostname
+            ? $this->reportOk('log hostname', $hostname)
+            : $this->reportSkip('log hostname', 'records are not stamped with a hostname - set LOG_HOSTNAME');
 
-            return;
-        }
-
-        $levels = $this->option('logs')
-            ? ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency']
-            : ['info'];
-
-        foreach ($levels as $level)
-        {
-            try
-            {
-                Log::log($level, "app:validate test record", ['level' => $level]);
-            }
-            catch (\Throwable $e)
-            {
-                $this->reportFail("Log records", "writing a {$level} record failed: {$e->getMessage()}");
-
-                return;
-            }
-        }
-
-        $written = count($levels) === 1
-            ? "one info record written"
-            : count($levels) . " records written, one at every level";
-
-        $this->reportOk("Log records", $written);
+        $this->writeTestRecords();
     }
 
     protected function checkLogChannel(string $name) : void
@@ -218,15 +198,16 @@ class AppValidate extends BaseCommand
         if (in_array($driver, ['single', 'daily']))
         {
             $path = config("logging.channels.{$name}.path");
-            $directory = dirname($path);
 
-            if (is_writable($directory) || (file_exists($path) && is_writable($path)))
+            if (is_writable(dirname($path)) || (file_exists($path) && is_writable($path)))
             {
-                $this->reportOk("Log file ({$name})", $path);
+                $this->reportOk("log path ({$name})", $path);
             }
             else
             {
-                $this->reportFail("Log file ({$name})", "{$path} is not writable");
+                // wback writes the records first and would die here inside Monolog;
+                // checking before writing is what lets this be reported instead
+                $this->reportFail("log path ({$name})", "{$path} is not writable");
 
                 $this->stopLogging();
             }
@@ -238,18 +219,53 @@ class AppValidate extends BaseCommand
         {
             if (empty(config("logging.channels.{$name}.url")))
             {
-                $this->reportFail("Slack webhook", "channel [{$name}] is in the stack but no webhook is configured");
+                $this->reportFail('slack webhook', "channel [{$name}] is in the stack but no webhook is configured");
             }
             else
             {
                 // never print the webhook: this output goes into support tickets
-                $this->reportOk("Slack webhook", "set, posting at " . config("logging.channels.{$name}.level"));
+                $this->reportOk('slack webhook', 'set, posting at ' . config("logging.channels.{$name}.level")
+                    . ' as ' . config("logging.channels.{$name}.username"));
             }
 
             return;
         }
 
-        $this->reportOk("Log channel ({$name})", $driver ?? 'unknown driver');
+        $this->reportOk("log channel ({$name})", $driver ?? 'unknown driver');
+    }
+
+    /**
+     * Write a record at every level, and say so - the console cannot know what
+     * arrived at the other end, only that it was sent.
+     */
+    protected function writeTestRecords() : void
+    {
+        if ($this->loggingStopped)
+        {
+            $this->reportSkip('log records', 'not written - the destination above cannot be written');
+
+            return;
+        }
+
+        $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+
+        foreach ($levels as $level)
+        {
+            try
+            {
+                Log::log($level, "Validation test message [{$level}]");
+            }
+            catch (\Throwable $e)
+            {
+                $this->reportFail('log records', "writing a {$level} record failed: {$e->getMessage()}");
+
+                return;
+            }
+        }
+
+        $this->reportOk('log records', 'a message was written at every level');
+
+        $this->line('         check that your logs - and any webhook - received them');
     }
 
     protected function checkBinary(string $label, ?string $binary, string $versionFlag) : void
