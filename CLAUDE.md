@@ -67,6 +67,20 @@ code calls `$this->api->…` straight, with no try/catch. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
 
+**A mistyped command must exit non-zero, and that took an override.**
+`App\Kernel` narrows `LaravelZero\Framework\Kernel::ensureDefaultCommand()` so
+only a bare invocation or an options-only one is proxied to the default command;
+a first argument naming nothing reaches Symfony and fails. Stock behaviour
+proxies it, so `blbackup app:validte` printed the command list and exited 0 —
+the same silent success as the scheduler, in a tool whose exit code is the whole
+of what cron reads, and it would have made `app:validate` pass while checking
+nothing. It has to be rebound in `bootstrap/app.php` over the binding
+`Application::configure()` makes, or the class sits there doing nothing.
+`tests/Feature/UnknownCommandTest.php` drives `Kernel::handle()` directly,
+because `$this->artisan()` calls the command and never passes through the
+proxying — and it marks the input non-interactive, since Symfony's "Did you mean
+this?" prompt otherwise waits on stdin and hangs the suite.
+
 **Exit codes are the contract with cron**, and every command that works through
 a list uses the same shape: `reject()` rather than `each()`, so one failure
 doesn't stop the run and what is left is what failed, then a count logged and
