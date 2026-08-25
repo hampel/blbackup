@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -8,10 +9,12 @@ beforeEach(function () {
     $this->db = fakeServer(['id' => 200, 'name' => 'db1.example.com', 'memory' => 8192, 'vcpus' => 4, 'disk' => 80]);
 });
 
+const SERVER_HEADERS = ['ID', 'Name', 'Memory', 'VCPUs', 'Disk'];
+
 function serverRow(array $server): array
 {
     return [
-        $server['id'],
+        (string) $server['id'],
         $server['name'],
         Str::padLeft($server['memory'], 6),
         Str::padLeft($server['vcpus'], 5),
@@ -22,21 +25,22 @@ function serverRow(array $server): array
 it('lists every server in a table', function () {
     fakeApi([$this->db, $this->web]);
 
-    $this->artisan('servers')
-        ->expectsTable(
-            ['ID', 'Name', 'Memory', 'VCPUs', 'Disk'],
-            // sorted by id, whatever order the API returned them in
-            [serverRow($this->web), serverRow($this->db)]
-        )
-        ->assertSuccessful();
+    expect(Artisan::call('servers'))->toBe(0);
+
+    // the whole table, so a row the command should not have printed fails here
+    expect(renderedTable(Artisan::output()))->toBe([
+        SERVER_HEADERS,
+        // sorted by id, whatever order the API returned them in
+        serverRow($this->web),
+        serverRow($this->db),
+    ]);
 });
 
 it('lists a single server by hostname', function () {
     fakeApi([$this->web]);
 
-    $this->artisan('servers', ['hostname' => 'web1.example.com'])
-        ->expectsTable(['ID', 'Name', 'Memory', 'VCPUs', 'Disk'], [serverRow($this->web)])
-        ->assertSuccessful();
+    expect(Artisan::call('servers', ['hostname' => 'web1.example.com']))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([SERVER_HEADERS, serverRow($this->web)]);
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'hostname=web1.example.com'));
 });
@@ -44,9 +48,8 @@ it('lists a single server by hostname', function () {
 it('looks a numeric argument up as a server id', function () {
     fakeApi([$this->web, $this->db]);
 
-    $this->artisan('servers', ['hostname' => '200'])
-        ->expectsTable(['ID', 'Name', 'Memory', 'VCPUs', 'Disk'], [serverRow($this->db)])
-        ->assertSuccessful();
+    expect(Artisan::call('servers', ['hostname' => '200']))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([SERVER_HEADERS, serverRow($this->db)]);
 
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/servers/200'));
 });

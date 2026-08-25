@@ -252,3 +252,26 @@ function rcloneListing(array $entries): string
 {
     return json_encode($entries);
 }
+
+/**
+ * The table a command printed, as rows of cells - headers first.
+ *
+ * expectsTable() renders the rows it is given and asserts each resulting line
+ * appears in the output, which means it cannot see rows the command printed
+ * and the test did not expect. Comparing this against the whole expected table
+ * catches extra rows, missing rows and wrong order alike.
+ *
+ * Cells keep any padding the command applied (Str::padLeft) and lose only the
+ * single space the renderer puts either side, so alignment is still asserted.
+ */
+function renderedTable(string $output): array
+{
+    return collect(explode(PHP_EOL, $output))
+        ->map(fn ($line) => rtrim($line))
+        ->filter(fn ($line) => str_starts_with($line, '|'))
+        ->map(fn ($line) => collect(explode('|', trim($line, '|')))
+            ->map(fn ($cell) => rtrim(substr($cell, 1)))
+            ->all())
+        ->values()
+        ->all();
+}

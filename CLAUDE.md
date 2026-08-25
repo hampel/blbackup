@@ -174,8 +174,10 @@ by routing on the request path, `fakeBinaries()` fakes the external commands wit
 a fall-through to success, `wgetWrites()` is a wget fake that writes the file
 wget would have written, `writeServerList()` writes an `--include` / `--exclude`
 list, `putAgedDownload()` writes a backup with a modification time for `clean`
-to expire, `rcloneEntry()` / `rcloneListing()` build `rclone lsjson` output, and
-`backupPath()` gives the path the command derives for the standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
+to expire, `rcloneEntry()` / `rcloneListing()` build `rclone lsjson` output,
+`renderedTable()` parses a printed table back into rows for an exact
+comparison, and `backupPath()` gives the path the command derives for the
+standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
 `create` poll loop reads, and an entry may be a closure — which is how a test
 makes something happen between one poll and the next.
 
@@ -190,11 +192,15 @@ Eight things that will catch you out:
 - **`Http::fake()` honours the `sink` option**, so the `--no-wget` path really
   writes the faked body to disk. That is why the fake `.zst` response body is
   exactly `MEGABYTE` bytes.
-- **`expectsTable()` cannot see extra rows.** It renders the rows you give it
-  and asserts each resulting line appears in the output, so a command listing
-  rows it should have filtered out still passes. Assert the exclusions with
-  `doesntExpectOutputToContain()` — a mutation that deleted `backups`' public /
-  non-backup filter passed a table assertion until that was added.
+- **Don't use `expectsTable()` — it cannot see extra rows.** It renders the rows
+  you give it and asserts each resulting line appears in the output, so a
+  command printing rows the test never mentioned still passes. Deleting
+  `backups`' public / non-backup filter passed its table assertion; so did
+  injecting a bogus row into all three listing commands. Use
+  `renderedTable(Artisan::output())` and compare the whole table with `toBe()`,
+  which catches extra rows, missing rows and wrong order alike. The servers
+  tests appeared to catch the bogus row only because the name chosen was long
+  enough to change the column widths — a shorter one went through.
 - **`expectsOutputToContain()` consumes one expectation per line**, so two of
   them cannot both match the same line. Two values on one table row need a
   single `expectsTable()` row instead — which is why the timezone test asserts a

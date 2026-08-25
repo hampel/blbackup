@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
@@ -20,7 +21,7 @@ function imageRow(array $image): array
     $created = Carbon\Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at']);
 
     return [
-        Str::padLeft($image['id'], 9),
+        Str::padLeft((string) $image['id'], 9),
         $image['full_name'],
         $created->toDateTimeString(),
         $created->timezone('Australia/Sydney')->toDateTimeString(),
@@ -33,10 +34,18 @@ const BACKUP_HEADERS = ['Backup ID', 'Backup Name', 'Created (UTC)', 'Created (l
 it('lists every backup image when given no server', function () {
     fakeApi([$this->server], [$this->image, $this->older]);
 
-    $this->artisan('backups')
-        ->expectsOutputToContain('All backup images on BinaryLane')
-        ->expectsTable(BACKUP_HEADERS, [imageRow($this->older), imageRow($this->image)])
-        ->assertSuccessful();
+    expect(Artisan::call('backups'))->toBe(0);
+
+    $output = Artisan::output();
+
+    expect($output)->toContain('All backup images on BinaryLane')
+        // the whole table, so an image the command should have filtered out
+        // fails here rather than passing unnoticed
+        ->and(renderedTable($output))->toBe([
+            BACKUP_HEADERS,
+            imageRow($this->older),
+            imageRow($this->image),
+        ]);
 });
 
 it('shows the creation time in UTC and in the configured timezone', function () {
@@ -46,15 +55,17 @@ it('shows the creation time in UTC and in the configured timezone', function () 
     // both columns come from the one timestamp: 14:30 UTC is 10:30 in New York
     // in August. Asserted as a table row because two expectsOutputToContain()
     // calls cannot both match the same line.
-    $this->artisan('backups')
-        ->expectsTable(BACKUP_HEADERS, [[
-            Str::padLeft($this->image['id'], 9),
+    expect(Artisan::call('backups'))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([
+        BACKUP_HEADERS,
+        [
+            Str::padLeft((string) $this->image['id'], 9),
             $this->image['full_name'],
             '2026-08-20 14:30:00',
             '2026-08-20 10:30:00',
             Str::padLeft(Number::format($this->image['size_gigabytes'], 2), 7),
-        ]])
-        ->assertSuccessful();
+        ],
+    ]);
 });
 
 it('leaves out public images and anything that is not a backup', function () {
@@ -63,22 +74,19 @@ it('leaves out public images and anything that is not a backup', function () {
 
     fakeApi([$this->server], [$this->image, $public, $snapshot]);
 
-    // expectsTable() only checks that the rows it is given appear - it cannot
-    // see extra ones, so the exclusions have to be asserted as absences
-    $this->artisan('backups')
-        ->expectsTable(BACKUP_HEADERS, [imageRow($this->image)])
-        ->doesntExpectOutputToContain('ubuntu-24-04')
-        ->doesntExpectOutputToContain('a snapshot')
-        ->assertSuccessful();
+    expect(Artisan::call('backups'))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([BACKUP_HEADERS, imageRow($this->image)]);
 });
 
 it('lists the backups for a hostname', function () {
     fakeApi([$this->server], [$this->image]);
 
-    $this->artisan('backups', ['server' => 'web1.example.com'])
-        ->expectsOutputToContain('Backups for web1.example.com (100):')
-        ->expectsTable(BACKUP_HEADERS, [imageRow($this->image)])
-        ->assertSuccessful();
+    expect(Artisan::call('backups', ['server' => 'web1.example.com']))->toBe(0);
+
+    $output = Artisan::output();
+
+    expect($output)->toContain('Backups for web1.example.com (100):')
+        ->and(renderedTable($output))->toBe([BACKUP_HEADERS, imageRow($this->image)]);
 });
 
 it('looks a numeric argument up as a server id', function () {

@@ -1,21 +1,26 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 
 it('shows the account email and status', function () {
     fakeApi([], account: fakeAccount());
 
-    $this->artisan('account')
-        ->expectsTable(['Email', 'Status'], [['backups@example.com', 'active']])
-        ->assertSuccessful();
+    expect(Artisan::call('account'))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([
+        ['Email', 'Status'],
+        ['backups@example.com', 'active'],
+    ]);
 });
 
 it('shows an account that is not active', function () {
     fakeApi([], account: fakeAccount(['status' => 'warning']));
 
-    $this->artisan('account')
-        ->expectsTable(['Email', 'Status'], [['backups@example.com', 'warning']])
-        ->assertSuccessful();
+    expect(Artisan::call('account'))->toBe(0);
+    expect(renderedTable(Artisan::output()))->toBe([
+        ['Email', 'Status'],
+        ['backups@example.com', 'warning'],
+    ]);
 });
 
 it('fails when the token is rejected', function () {
