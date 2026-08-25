@@ -109,21 +109,42 @@ class Create extends BaseCommand
             $excludeServers = array_filter(explode(PHP_EOL, File::get($exclude)));
         }
 
-        collect($servers)
+        $failed = collect($servers)
             ->filter(function ($server) use ($includeServers) {
                 return $includeServers ? in_array($server['name'], $includeServers) : true;
             })
             ->reject(function ($server) use ($excludeServers) {
                 return $excludeServers ? in_array($server['name'], $excludeServers) : false;
             })
-            ->each(function ($server) {
+            // reject rather than each, so one server that fails doesn't stop
+            // the run and what is left is the servers that were not backed up
+            ->reject(function ($server) {
 
-                if ($this->backup($server) && $this->option('download'))
+                if (! $this->backup($server))
+                {
+                    return false;
+                }
+
+                if ($this->option('download'))
                 {
                     $this->call('download', ['server' => $server['id'], '--move' => $this->option('move')]);
                 }
 
+                return true;
+
             });
+
+        if ($failed->isNotEmpty())
+        {
+            $this->log(
+                'error',
+                "{$failed->count()} server backup(s) did not complete",
+                "Server backups did not complete",
+                ['count' => $failed->count(), 'servers' => $failed->pluck('name')->all()]
+            );
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

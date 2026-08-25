@@ -67,17 +67,18 @@ code calls `$this->api->…` straight, with no try/catch. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
 
-**Exit codes are the contract with cron.** `check`, `move` and `clean` collect
-their per-file failures with `reject()` so one bad file doesn't stop the run,
-then log a count and return FAILURE at the end — a single-file run fails if that
-file failed, an `--all` run fails if any did. `download` propagates the exit code
-of the `move` it calls. Use that shape for anything new: a `return` inside an
-`each()` closure returns from the closure, not the command, which is how
-`clean`'s remote deletions used to fail silently.
+**Exit codes are the contract with cron**, and every command that works through
+a list uses the same shape: `reject()` rather than `each()`, so one failure
+doesn't stop the run and what is left is what failed, then a count logged and
+FAILURE returned at the end. `create` reports servers whose backup errored or
+timed out; `check`, `move` and `clean` report the files they could not handle;
+`download` propagates the exit code of the `move` it calls. Copy that shape for
+anything new — a `return` inside an `each()` closure returns from the closure,
+not the command, which is how `clean`'s remote deletions used to fail silently.
 
-`create` is the remaining exception: an errored or timed-out backup is logged,
-but the command still exits SUCCESS. Worth knowing before trusting a green cron
-run.
+The exception left is `download` itself: a per-image failure under a hostname or
+`--all` (a bad size, a failed wget) is logged, but `handle()` still returns
+SUCCESS. Only the `--image` form propagates it.
 
 **`log($level, $message, $logMessage = null, $context = [])`** dual-writes: to
 Monolog (structured, with `$context`) and to the console (styled, gated by a

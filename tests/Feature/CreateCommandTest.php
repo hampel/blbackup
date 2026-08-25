@@ -55,7 +55,8 @@ it('reports a backup that errors', function () {
 
     $this->artisan('create', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('Error backing up web1.example.com - status: errored')
-        ->assertSuccessful();
+        ->expectsOutputToContain('1 server backup(s) did not complete')
+        ->assertFailed();
 });
 
 it('gives up on a backup that exceeds the timeout', function () {
@@ -72,7 +73,7 @@ it('gives up on a backup that exceeds the timeout', function () {
     $this->artisan('create', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('exceeded timeout of 15 seconds')
         ->expectsOutputToContain('Error backing up web1.example.com - status: in-progress')
-        ->assertSuccessful();
+        ->assertFailed();
 });
 
 it('backs up every server with --all', function () {
@@ -179,7 +180,25 @@ it('does not download a backup that failed', function () {
 
     $this->artisan('create', ['server' => 'web1.example.com', '--download' => true])
         ->expectsOutputToContain('Error backing up')
-        ->assertSuccessful();
+        ->assertFailed();
 
     Process::assertNothingRan();
+});
+
+it('backs up the rest of the servers after one fails, then reports failure', function () {
+    // the status queue is consumed in order, so the first server errors and
+    // the second completes
+    fakeApi([$this->server, $this->other], statuses: [
+        fakeAction('errored', 40),
+        fakeAction('completed'),
+    ]);
+
+    $this->artisan('create', ['--all' => true])
+        ->expectsOutputToContain('Error backing up web1.example.com')
+        ->expectsOutputToContain('Completed server backup db1.example.com')
+        ->expectsOutputToContain('1 server backup(s) did not complete')
+        ->assertFailed();
+
+    // the failure must not stop the run - the second server is still backed up
+    Http::assertSent(backupWasRequestedFor(200));
 });
