@@ -9,3 +9,4 @@ storage/
 .box_dump/
 builds/
 CLAUDE.local.md
+rclone.conf

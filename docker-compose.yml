@@ -1,0 +1,40 @@
+# One-shot container, driven by cron on the host. There is no long-running
+# service here, so `docker compose run --rm` rather than `up`:
+#
+#   0 2 * * * cd /mnt/user/appdata/blbackup && \
+#             docker compose run --rm blbackup php blbackup create --all --download --move --no-interaction >> /mnt/user/logs/blbackup/cron.log 2>&1
+#
+# After any image rebuild:
+#
+#   docker compose run --rm blbackup php blbackup app:validate
+#
+# which runs each binary, lists the rclone remote and calls the API, and exits
+# non-zero if the image cannot do what the configuration says.
+
+services:
+  blbackup:
+    build: .
+    image: blbackup
+
+    volumes:
+      # Where downloaded backups land. DOWNLOAD_PATH in .env must name the
+      # container side of this mount (/downloads), not the host path - the app
+      # only ever sees the inside.
+      - /mnt/user/Downloads/blbackup/:/downloads
+
+      # LOG_STORAGE_PATH likewise, eg /logs/blbackup.log. A path that is not
+      # under a mount is written into the container and lost when it exits -
+      # and if the directory cannot be written at all, every command dies on
+      # its first API call, because App\Api logs every call.
+      - /mnt/user/logs/blbackup/:/logs
+
+      # Read-only: the container has no business rewriting its own settings.
+      - ./.env:/app/.env:ro
+
+      # NOT read-only. rclone rewrites this file when it refreshes an OAuth
+      # token, so a remote on Google Drive, Dropbox or OneDrive stops working
+      # after the current token expires if this is mounted :ro.
+      - ./rclone.conf:/root/.config/rclone/rclone.conf
+
+      # Server lists for create/download --include and --exclude.
+      - ./exclude.txt:/app/exclude.txt:ro

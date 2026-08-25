@@ -1,0 +1,28 @@
+# Nothing that identifies an installation may be copied into an image layer.
+#
+# docker-compose.yml mounts .env and rclone.conf over the top at runtime, which
+# hides a baked-in copy but does not remove it: the layer still holds the
+# BinaryLane API token and the rclone credentials, and travels with the image.
+.env
+.env.*
+!.env.example
+rclone.conf
+
+# Installed by composer inside the image, with --no-dev. Copying a working
+# checkout's vendor/ in would ship pest, pint and mockery to production.
+/vendor
+
+# Runtime data: downloaded backups, logs, and the compiled phar
+/storage
+/builds
+/.box_dump
+
+# The image does not need the history, the tests or the editor's opinions
+/.git
+/.idea
+/.vscode
+/tests
+phpunit.xml.dist
+_ide_helper.php
+CLAUDE.md
+CLAUDE.local.md
