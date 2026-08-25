@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Exceptions\BinaryLaneException;
 use App\Support\SlackSummary;
+use Hampel\ConsoleReport\RendersChecks;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -13,6 +14,8 @@ use Symfony\Component\Console\Helper\ProgressBar;
 
 class AppValidate extends BaseCommand
 {
+    use RendersChecks;
+
     /**
      * The name and signature of the console command.
      *
@@ -32,11 +35,6 @@ class AppValidate extends BaseCommand
     protected string $commandContext = 'validate';
 
     /**
-     * Whether any check has failed, which decides the exit code.
-     */
-    protected bool $failed = false;
-
-    /**
      * Set once the log destination is known to be unwritable, so nothing tries
      * to write to it again.
      */
@@ -47,6 +45,10 @@ class AppValidate extends BaseCommand
      */
     public function handle()
     {
+        // the package imports no Illuminate symbol, so it has to be handed
+        // somewhere to write before it renders anything
+        $this->setReportOutput($this->getOutput());
+
         $this->section("Environment");
         $this->checkPhp();
         $this->checkIntl();
@@ -71,20 +73,21 @@ class AppValidate extends BaseCommand
 
         $this->newLine();
 
-        if ($this->failed)
+        if ($this->checksFailed())
         {
             $this->line("Validation failed - this machine cannot do what the configuration says");
             $this->newLine();
 
             $this->record('error', "Validation failed");
-
-            return self::FAILURE;
+        }
+        else
+        {
+            $this->line($this->checksWarned() ? "Checks passed, with warnings" : "All checks passed");
+            $this->newLine();
         }
 
-        $this->line("All checks passed");
-        $this->newLine();
-
-        return self::SUCCESS;
+        // a warning is not a failure
+        return $this->checkExitCode();
     }
 
     protected function checkPhp() : void
@@ -490,21 +493,19 @@ class AppValidate extends BaseCommand
 
     protected function reportOk(string $label, string $detail = '') : void
     {
-        $this->render('<fg=green>[ ok ]</>', $label, $detail);
+        $this->checkOk($label, $detail);
     }
 
     protected function reportWarn(string $label, string $detail = '') : void
     {
-        $this->render('<fg=yellow>[warn]</>', $label, $detail);
+        $this->checkWarn($label, $detail);
 
         $this->record('warning', "Validation warning", compact('label', 'detail'));
     }
 
     protected function reportFail(string $label, string $detail = '') : void
     {
-        $this->failed = true;
-
-        $this->render('<fg=red>[fail]</>', $label, $detail);
+        $this->checkFail($label, $detail);
 
         $this->record('error', "Validation failure", compact('label', 'detail'));
     }
@@ -515,18 +516,7 @@ class AppValidate extends BaseCommand
      */
     protected function reportSkip(string $label, string $detail = '') : void
     {
-        $this->render('<fg=gray>[    ]</>', $label, $detail);
-    }
-
-    /**
-     * Written out by hand rather than with twoColumnDetail(), whose
-     * EnsureRelativePaths mutator strips base_path() out of every value and
-     * cannot be opted out of - which would print absolute paths as convincing
-     * relative ones, and paths are most of what this command reports.
-     */
-    protected function render(string $marker, string $label, string $detail) : void
-    {
-        $this->line("  {$marker} " . str_pad($label, 22) . " {$detail}");
+        $this->checkSkip($label, $detail);
     }
 
     protected function formatBytes(float $bytes) : string

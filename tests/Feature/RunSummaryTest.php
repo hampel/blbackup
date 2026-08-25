@@ -270,3 +270,51 @@ it('does not post a summary for the listing commands', function () {
 
     expect($history)->toBeEmpty();
 });
+
+it('reports a run that could not start at all', function () {
+    $history = [];
+    interceptSummary($history);
+
+    fakeApi([]);
+
+    // nothing ran, so nothing logged anything worth summarising - this is the
+    // failure that otherwise leaves one log line and no alert
+    $this->artisan('create', ['server' => 'nothing.example.com'])->assertFailed();
+
+    expect($history)->toHaveCount(1);
+
+    $payload = sentPayload($history);
+
+    expect($payload['text'])->toBe('Backup did not run on unraid')
+        ->and($payload['attachments'][0]['text'])->toContain('No server data returned')
+        ->and($payload['attachments'][0]['fields'] ?? [])->toBe([]);
+});
+
+it('reports an unreadable server list as a run that did not start', function () {
+    $history = [];
+    interceptSummary($history);
+
+    fakeApi([fakeServer()]);
+
+    $this->artisan('create', ['--all' => true, '--include' => '/no/such/list.txt'])->assertFailed();
+
+    expect(sentPayload($history)['text'])->toBe('Backup did not run on unraid')
+        ->and(sentPayload($history)['attachments'][0]['text'])->toContain('/no/such/list.txt');
+});
+
+it('keeps what a run did when it fails part way through', function () {
+    $history = [];
+    interceptSummary($history);
+
+    putDownload(backupPath(), MEGABYTE);
+    fakeBinaries();
+
+    // move succeeds, then the second file is missing: a failure within a run,
+    // not a run that never started - the move it did manage must survive
+    $this->artisan('move', ['file' => backupPath()])->assertSuccessful();
+    $summary = app(App\Support\RunSummary::class);
+    $summary->recordFailure('other.zst', 'move', 'gone');
+
+    expect($summary->hasWork())->toBeTrue()
+        ->and($summary->blockedBy())->toBeNull();
+});

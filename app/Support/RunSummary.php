@@ -89,6 +89,19 @@ class RunSummary
         $this->blockedBy = $reason;
     }
 
+    /**
+     * @return bool whether the run got as far as doing anything at all, which is
+     *              what separates a run that failed from one that never started
+     */
+    public function hasWork() : bool
+    {
+        return $this->backups !== []
+            || $this->downloads !== []
+            || $this->moves !== []
+            || $this->deletions !== []
+            || $this->failures !== [];
+    }
+
     public function blockedBy() : ?string
     {
         return $this->blockedBy;

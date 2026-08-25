@@ -111,16 +111,45 @@ abstract class BaseCommand extends Command
 
     public function fail(\Throwable|string|null $exception = null)
     {
-        if (is_string($exception))
+        $message = match (true) {
+            is_string($exception) => $exception,
+            $exception instanceof \Throwable => $exception->getMessage(),
+            default => null,
+        };
+
+        if ($message !== null)
         {
-            Log::error($exception);
-        }
-        elseif ($exception instanceof \Throwable)
-        {
-            Log::error($exception->getMessage());
+            Log::error($message);
+
+            $this->recordFailedStart($message);
         }
 
         parent::fail($exception);
+    }
+
+    /**
+     * A run that could not start still has to report.
+     *
+     * That is the failure which otherwise leaves one log line and no alert:
+     * an unreadable server list, a missing remote, an API token that no longer
+     * works. Nothing ran, so nothing logged anything worth summarising, and the
+     * summary that never arrives looks exactly like a night when there was
+     * nothing to do.
+     *
+     * Recorded as a block only when the run had not done anything yet - a fail()
+     * after real work is a failure within a run, and reporting it as "did not
+     * run" would throw away everything the run did manage.
+     */
+    protected function recordFailedStart(string $message) : void
+    {
+        if (!isset($this->summary) || !$this->ownsRun)
+        {
+            return;
+        }
+
+        $this->summary->hasWork()
+            ? $this->summary->recordFailure($this->getName(), $this->getName(), $message)
+            : $this->summary->block($message);
     }
 
     protected function log($level, $message, $logMessage = null, $context = [])

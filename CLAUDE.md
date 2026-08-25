@@ -73,10 +73,21 @@ configured binary, lists the rclone remote, calls the API, write-probes the
 download directory and writes a real log record. Four outcomes — `[ ok ]`,
 `[warn]`, `[fail]`, and a blank marker for a check that did not apply, which is
 deliberately not a pass — and a non-zero exit if anything failed, so an image
-rebuild can be gated on it. It renders its own output rather than using
-`twoColumnDetail()`, whose `EnsureRelativePaths` mutator would print absolute
-paths as convincing relative ones, and it prints no credential: the API token
-and the Slack webhook report as set, never as their value.
+rebuild can be gated on it. **Do not report anything with `$this->components->twoColumnDetail()`.** Its
+`EnsureRelativePaths` mutator strips `base_path().'/'` out of every value and
+cannot be opted out of, so absolute paths print as convincing relative ones —
+`app:config` reported the storage path as `storage` for exactly this reason.
+`hampel/console-report` is why that is fixed: `ReportsSettings` + `FormatsValues`
+draw the settings dump and `RendersChecks` draws the `[ ok ]` / `[warn]` /
+`[fail]` rows and owns the exit code. The package imports no Illuminate symbol,
+so it has to be handed somewhere to write — `setReportOutput($this->getOutput())`
+at the top of `handle()`, which both commands do; forget it in a third and the
+first render throws a `LogicException` naming the missing call.
+
+Credentials go through `secretStatus()`, never printed: a settings dump is what
+gets pasted into a ticket, and a working token pasted anywhere is a working
+token. Paths go through `path()`, which reports a relative one along with what it
+resolves against — under cron that is wherever the crontab last changed to.
 
 Two things it has to defend against, both of which bit while it was written.
 Reporting a failure writes to the log, so validating an unwritable log

@@ -34,7 +34,18 @@ it('passes when the machine can do what the configuration says', function () {
         ->and($output)->toContain('[ ok ] PHP')
         ->toContain('[ ok ] ext-intl')
         ->toContain('[ ok ] Timezone')
-        ->toContain('All checks passed');
+        // the default test config logs nowhere, which warns - and a warning is
+        // not a failure
+        ->toContain('Checks passed, with warnings');
+});
+
+it('says so plainly when nothing warned either', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('All checks passed');
 });
 
 it('reports the version of each external binary', function () {

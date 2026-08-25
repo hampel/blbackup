@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8703d10fae9142b6cd2dc18eb04dd245",
+    "content-hash": "51a7505c9384ed356d2a591e51980fd8",
     "packages": [
         {
             "name": "brick/math",
@@ -908,6 +908,65 @@
                 }
             ],
             "time": "2026-08-24T09:15:32+00:00"
+        },
+        {
+            "name": "hampel/console-report",
+            "version": "2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hampel/console-report.git",
+                "reference": "507a075d64da473f86aedce75177169eca9af638"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hampel/console-report/zipball/507a075d64da473f86aedce75177169eca9af638",
+                "reference": "507a075d64da473f86aedce75177169eca9af638",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": ">=8.3",
+                "symfony/console": "^5.4|^6.0|^7.0|^8.0"
+            },
+            "require-dev": {
+                "hampel/rig": "^0.1.2",
+                "illuminate/console": "^12.0|^13.0",
+                "laravel/pint": "^1.30",
+                "phpstan/phpstan": "^2.1.22",
+                "phpunit/phpunit": "^12.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Hampel\\ConsoleReport\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Simon Hampel",
+                    "email": "simon@hampelgroup.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Console output for CLI tools that report on themselves - settings dumps and validation checks, with paths printed whole",
+            "homepage": "https://github.com/hampel/console-report",
+            "keywords": [
+                "cli",
+                "console",
+                "laravel",
+                "laravel-zero",
+                "symfony-console",
+                "xenforo"
+            ],
+            "support": {
+                "issues": "https://github.com/hampel/console-report/issues",
+                "source": "https://github.com/hampel/console-report"
+            },
+            "time": "2026-08-22T13:15:37+00:00"
         },
         {
             "name": "hampel/slack-message",
