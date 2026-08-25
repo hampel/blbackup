@@ -253,3 +253,63 @@ it('downloads the other servers after one fails, then reports failure', function
     // the failure must not stop the run - the other server is still downloaded
     expect(Storage::disk('downloads')->exists($this->path))->toBeTrue();
 });
+
+it('downloads only the servers named in an include file', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', [
+        '--all' => true,
+        '--include' => writeServerList('include.txt', ['db1.example.com']),
+    ])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'db1.example.com'));
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+});
+
+it('skips the servers named in an exclude file', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', [
+        '--all' => true,
+        '--exclude' => writeServerList('exclude.txt', ['db1.example.com']),
+    ])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'db1.example.com'));
+});
+
+it('fails when the include file cannot be read', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries();
+
+    $this->artisan('download', ['--all' => true, '--include' => '/no/such/list.txt'])
+        ->expectsOutputToContain('Include file [/no/such/list.txt] does not exists or is not readable')
+        ->assertFailed();
+
+    Process::assertNothingRan();
+});
+
+it('fails when the exclude file cannot be read', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries();
+
+    $this->artisan('download', ['--all' => true, '--exclude' => '/no/such/list.txt'])
+        ->expectsOutputToContain('Exclude file [/no/such/list.txt] does not exists or is not readable')
+        ->assertFailed();
+
+    Process::assertNothingRan();
+});
+
+it('runs wget from the download root', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'wget')
+        && $process->path === downloadPath());
+});

@@ -151,3 +151,15 @@ it('fails when one of several files cannot be moved', function () {
     // the failure must not stop the run - the second file is still attempted
     Process::assertRan(movedTo(downloadPath($second), "remote:backups/{$second}"));
 });
+
+it('runs rclone from the storage path', function () {
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    $this->artisan('move', ['file' => $this->path])->assertSuccessful();
+
+    // the working directory is deliberate: rclone resolves a directory-based
+    // remote against it, so a wrong cwd breaks those remotes only
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'moveto')
+        && $process->path === storage_path());
+});

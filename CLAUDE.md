@@ -181,6 +181,18 @@ standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payl
 `create` poll loop reads, and an entry may be a closure — which is how a test
 makes something happen between one poll and the next.
 
+The suite has been audited by mutation: change one behaviour in `app/`, run the
+suite, and a test should fail. 49 mutations were tried across the commands, the
+API client and the service provider; the gaps that found are now covered
+(`download`'s `--include` / `--exclude`, `backups --ids` filtering and its
+per-server form, the `Http::binarylane()` token and base url, the timezone
+default, and the deliberate working directory each external process runs in).
+Do the same for anything substantial you add — a passing test proves nothing
+until you have seen it fail. Two mutations survive on purpose and are not worth
+chasing: deleting `create`'s `errored` status check changes nothing, because the
+`!== 'in-progress'` check below it catches the same case, and the download
+timeout cannot be observed through `Http::fake()`, which never times out.
+
 Eight things that will catch you out:
 
 - **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —

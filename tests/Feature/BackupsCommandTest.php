@@ -100,12 +100,28 @@ it('looks a numeric argument up as a server id', function () {
 });
 
 it('lists just the ids with --ids', function () {
-    fakeApi([$this->server], [$this->image, $this->older]);
+    $public = fakeImage(['id' => 777, 'public' => true]);
+    $snapshot = fakeImage(['id' => 888, 'type' => 'snapshot']);
+
+    fakeApi([$this->server], [$this->image, $this->older, $public, $snapshot]);
 
     $this->artisan('backups', ['--ids' => true])
         ->expectsOutput('111')
         ->expectsOutput('12345')
+        // --ids applies the same public / non-backup filter as the table
+        ->doesntExpectOutputToContain('777')
+        ->doesntExpectOutputToContain('888')
         ->doesntExpectOutputToContain('Backup Name')
+        ->assertSuccessful();
+});
+
+it('lists just the ids of one server backups with --ids', function () {
+    fakeApi([$this->server], [$this->image, $this->older]);
+
+    $this->artisan('backups', ['server' => 'web1.example.com', '--ids' => true])
+        ->expectsOutput('111')
+        ->expectsOutput('12345')
+        ->doesntExpectOutputToContain('web1.example.com older backup')
         ->assertSuccessful();
 });
 

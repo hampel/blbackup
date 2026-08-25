@@ -121,3 +121,13 @@ it('lists every file without testing them with --all --dry-run', function () {
 
     Process::assertNothingRan();
 });
+
+it('runs zstd from the download root', function () {
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    $this->artisan('check', ['file' => $this->path])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'zstd')
+        && $process->path === downloadPath());
+});
