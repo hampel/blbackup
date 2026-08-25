@@ -29,6 +29,8 @@ class Clean extends BaseCommand
 
     protected string $commandContext = 'clean';
 
+    protected bool $summarises = true;
+
     /**
      * Execute the console command.
      */
@@ -88,6 +90,8 @@ class Clean extends BaseCommand
                     );
 
                     Storage::disk('downloads')->delete($path);
+
+                    $this->summary->recordDeletion($path);
                 }
 
             });
@@ -174,6 +178,8 @@ class Clean extends BaseCommand
                         compact('path')
                     );
 
+                    $this->summary->recordDeletion($path);
+
                     $cmd = "{$rclone}{$verbosity} deletefile {$remotePath}/{$path}";
 
                     $this->logCmd('rclone deletefile', $cmd);
@@ -190,6 +196,8 @@ class Clean extends BaseCommand
                             "Could not delete old backup file from remote filesystem",
                             compact('path', 'output')
                         );
+
+                        $this->summary->recordFailure($path, 'clean', $output);
 
                         return false;
                     }

@@ -18,6 +18,7 @@
     "require": {
         "php": "^8.3",
         "ext-intl": "*",
+        "hampel/slack-message": "^2.2",
         "illuminate/http": "^12.17",
         "illuminate/log": "^12.17",
         "laravel-zero/framework": "^12.0"

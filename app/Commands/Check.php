@@ -28,6 +28,8 @@ class Check extends BaseCommand
 
     protected string $commandContext = 'check';
 
+    protected bool $summarises = true;
+
     /**
      * Execute the console command.
      */
@@ -134,6 +136,8 @@ class Check extends BaseCommand
                 "Downloaded file failed zstd test",
                 compact('path', 'output', 'cmd')
             );
+
+            $this->summary->recordFailure(basename($path), 'check', $output);
         }
         else
         {

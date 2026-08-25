@@ -39,6 +39,8 @@ class Download extends BaseCommand
 
     protected string $commandContext = 'download';
 
+    protected bool $summarises = true;
+
     /**
      * Execute the console command.
      */
@@ -155,6 +157,8 @@ class Download extends BaseCommand
                         "No backup data returned",
                         ['server' => $server['name']]
                     );
+
+                    $this->summary->recordFailure($server['name'], 'download', 'no backup data returned');
 
                     return false;
                 }
@@ -350,6 +354,9 @@ class Download extends BaseCommand
             );
 
             Storage::disk('downloads')->delete($path);
+
+            $this->summary->recordFailure($server['name'], 'check', 'failed the zstd test and was deleted');
+
             return false;
         }
 
@@ -366,12 +373,19 @@ class Download extends BaseCommand
                 ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
+            $this->summary->recordFailure(
+                $server['name'], 'download',
+                "downloaded {$sizeGb} GB, expected {$expectedSize} GB"
+            );
+
             return false;
         }
 
         $sizeFormatted = Number::format($sizeGb, 2);
 
         $this->line("Successfully downloaded {$sizeFormatted} GB to [{$path}]");
+
+        $this->summary->recordDownload($server['name'], $path, $size);
 
         if ($this->option('move'))
         {

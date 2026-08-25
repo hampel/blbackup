@@ -34,6 +34,8 @@ class Create extends BaseCommand
 
     protected string $commandContext = 'create';
 
+    protected bool $summarises = true;
+
     /**
      * Execute the console command.
      */
@@ -229,6 +231,8 @@ class Create extends BaseCommand
             );
             $this->newLine();
 
+            $this->summary->recordBackup($server['name'], $seconds);
+
             return true;
         }
         else
@@ -239,6 +243,8 @@ class Create extends BaseCommand
                 "Error backing up server",
                 ['server' => $server['name'], 'server_id' => $server['id'], 'status' => $status['status'], 'disk_size' => $server['disk']]
             );
+
+            $this->summary->recordFailure($server['name'], 'create', "backup {$status['status']}");
 
             return false;
         }

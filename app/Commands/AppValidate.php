@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Exceptions\BinaryLaneException;
+use App\Support\SlackSummary;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -60,6 +61,9 @@ class AppValidate extends BaseCommand
         $this->checkBinary('wget', config('binarylane.wget_binary'), '--version');
         $this->checkBinary('rclone', config('binarylane.rclone.binary'), '--version');
         $this->checkRemote();
+
+        $this->section("Run summary");
+        $this->checkSummary();
 
         $this->section("BinaryLane API");
         $this->checkApi();
@@ -266,6 +270,37 @@ class AppValidate extends BaseCommand
         $this->reportOk('log records', 'a message was written at every level');
 
         $this->line('         check that your logs - and any webhook - received them');
+    }
+
+    /**
+     * Post the test message, because a webhook that has stopped working says
+     * nothing about it at this end - the summary simply never arrives, which
+     * looks exactly like a backup that never ran.
+     */
+    protected function checkSummary() : void
+    {
+        $reporter = $this->app->make(SlackSummary::class);
+
+        if (!$reporter->isConfigured())
+        {
+            $this->reportSkip('run summary', 'nothing is sent - set BLBACKUP_SUMMARY_SLACK_WEBHOOK');
+
+            return;
+        }
+
+        try
+        {
+            $reporter->sendTest();
+        }
+        catch (\Throwable $e)
+        {
+            $this->reportFail('run summary', trim(strtok($e->getMessage(), "\n") ?: ''));
+
+            return;
+        }
+
+        $this->reportOk('run summary', 'test message delivered, sent on '
+            . config('binarylane.summary.notify'));
     }
 
     protected function checkBinary(string $label, ?string $binary, string $versionFlag) : void

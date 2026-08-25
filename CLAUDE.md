@@ -100,6 +100,33 @@ because `$this->artisan()` calls the command and never passes through the
 proxying — and it marks the input non-interactive, since Symfony's "Did you mean
 this?" prompt otherwise waits on stdin and hangs the suite.
 
+**The run summary is a notification, not a log record.** `App\Support\RunSummary`
+is a container singleton — for the same reason the stages need one, since
+`create` calls `download` and `download` calls `move`, and the thing being
+summarised is the run rather than any one command. `BaseCommand` claims the run
+for whichever command was invoked (`$summarises` is false on the listing
+commands, which have nothing to report), records what each stage produced and
+each failure, and posts once at the end. `App\Support\SlackSummary` renders it
+and sends it with `hampel/slack-message`, which needs only a PSR-18 client —
+Guzzle is already a `laravel-zero/framework` dependency, so it costs one package
+rather than the 25 `illuminate/notifications` would.
+
+Sending happens in a `finally` and can never fail the run: whether Slack heard
+about the work does not change whether the work succeeded. A failed send logs a
+warning and leaves the exit code alone.
+
+**`SlackSummary` reads no config and resolves nothing.** Webhook, notify policy,
+application string and hostname all arrive through its constructor, and
+`AppServiceProvider` does the reading. Keep it that way — if a new setting is
+needed in a message, add a constructor argument and bind it, don't reach for
+`config()` inside the class. The `slack` log channel stays as the backstop; the
+two are complementary, and `config/binarylane.php` says why: a log channel posts
+a record at a time, so a night where everything worked produces nothing at all.
+
+Tests fake at the HTTP client (`MockHandler` + `Middleware::history()`) and
+assert on the decoded request body, because the payload is what the code
+produces — mocking the sender would test nothing.
+
 **Exit codes are the contract with cron**, and every command that works through
 a list uses the same shape: `reject()` rather than `each()`, so one failure
 doesn't stop the run and what is left is what failed, then a count logged and

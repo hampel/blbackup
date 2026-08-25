@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d5125c31e6cf52279186633879d4f1db",
+    "content-hash": "8703d10fae9142b6cd2dc18eb04dd245",
     "packages": [
         {
             "name": "brick/math",
@@ -908,6 +908,70 @@
                 }
             ],
             "time": "2026-08-24T09:15:32+00:00"
+        },
+        {
+            "name": "hampel/slack-message",
+            "version": "2.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hampel/slack-message.git",
+                "reference": "57bf803b04ce5ec7855beba7f1033ccb6878359c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hampel/slack-message/zipball/57bf803b04ce5ec7855beba7f1033ccb6878359c",
+                "reference": "57bf803b04ce5ec7855beba7f1033ccb6878359c",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.3",
+                "psr/http-client": "^1.0",
+                "psr/http-factory": "^1.0",
+                "psr/http-message": "^1.1 || ^2.0"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.8 || ^8.0",
+                "hampel/rig": "^0.1.0",
+                "laravel/pint": "^1.30",
+                "mockery/mockery": "^1.6",
+                "phpstan/phpstan": "^2.2",
+                "phpunit/phpunit": "^12.0"
+            },
+            "suggest": {
+                "guzzlehttp/guzzle": "Sends the message. Any PSR-18 client will do; Guzzle (^7.0 or ^8.0) also provides the PSR-17 factories, which are then discovered automatically"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Hampel\\SlackMessage\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Simon Hampel",
+                    "email": "simon@hampelgroup.com"
+                },
+                {
+                    "name": "Taylor Otwell",
+                    "email": "taylor@laravel.com"
+                }
+            ],
+            "description": "Standalone implementation of Laravel's SlackMessage classes from illuminate/notifications",
+            "homepage": "https://github.com/hampel/slack-message",
+            "keywords": [
+                "laravel",
+                "notifications",
+                "slack"
+            ],
+            "support": {
+                "issues": "https://github.com/hampel/slack-message/issues",
+                "source": "https://github.com/hampel/slack-message"
+            },
+            "time": "2026-08-19T13:44:35+00:00"
         },
         {
             "name": "illuminate/bus",

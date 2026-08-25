@@ -52,6 +52,12 @@ class AppConfig extends Command
             'wget Binary' => config('binarylane.wget_binary'),
         ]);
 
+        static::addToSection('Run summary', fn () => [
+            // set or not set, never the value: this output goes into tickets
+            'Slack Webhook' => config('binarylane.summary.slack_webhook') ? 'set' : 'not set',
+            'Notify' => config('binarylane.summary.notify'),
+        ]);
+
         static::addToSection('Filesystems', fn () => [
             'Default' => config('filesystems.default'),
             'Storage Path' => storage_path(),

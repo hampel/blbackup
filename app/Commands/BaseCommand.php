@@ -2,6 +2,8 @@
 
 use App\Api;
 use App\Exceptions\BinaryLaneException;
+use App\Support\RunSummary;
+use App\Support\SlackSummary;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
@@ -15,6 +17,20 @@ abstract class BaseCommand extends Command
 
     protected Api $api;
 
+    protected RunSummary $summary;
+
+    /**
+     * Whether this command reports a run summary when it is the one invoked.
+     * The listing commands do not: nothing was done to report.
+     */
+    protected bool $summarises = false;
+
+    /**
+     * Whether this command claimed the run, and so is the one that reports it.
+     * The stages it calls see the run is taken and leave it alone.
+     */
+    protected bool $ownsRun = false;
+
     protected function execute(InputInterface $input, OutputInterface $output) : int
     {
         if (isset($this->commandContext)) {
@@ -22,17 +38,67 @@ abstract class BaseCommand extends Command
         }
 
         $this->api = $this->app->make(Api::class);
+        $this->summary = $this->app->make(RunSummary::class);
+
+        if ($this->summarises)
+        {
+            $this->ownsRun = $this->summary->claim(
+                $this->getName(),
+                $input->hasOption('dry-run') && $input->getOption('dry-run')
+            );
+        }
 
         try
         {
-            return parent::execute($input, $output);
+            $status = parent::execute($input, $output);
         }
         catch (BinaryLaneException | ConnectionException $e)
         {
             Log::error($e->getMessage());
             $this->components->error($e->getMessage());
 
-            return static::FAILURE;
+            $this->summary->recordFailure($this->getName(), $this->getName(), $e->getMessage());
+
+            $status = static::FAILURE;
+        }
+        finally
+        {
+            // after the work, and never able to change its outcome
+            if ($this->ownsRun)
+            {
+                $this->reportRun();
+            }
+        }
+
+        return $status;
+    }
+
+    /**
+     * Post the run summary.
+     *
+     * Whether Slack heard about the work does not change whether the work
+     * succeeded, so everything here is caught and the command's own exit code
+     * is left alone. A webhook that has stopped answering must cost the run a
+     * warning, not the night.
+     */
+    protected function reportRun() : void
+    {
+        try
+        {
+            $reporter = $this->app->make(SlackSummary::class);
+
+            if (!$reporter->shouldSend($this->summary))
+            {
+                return;
+            }
+
+            $reporter->send($this->summary);
+        }
+        catch (\Throwable $e)
+        {
+            Log::warning("Could not send the run summary", ['error' => $e->getMessage()]);
+
+            $this->line("Could not send the run summary: " . $e->getMessage());
         }
     }
 

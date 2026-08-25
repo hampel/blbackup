@@ -32,6 +32,8 @@ class Move extends BaseCommand
 
     protected string $commandContext = 'move';
 
+    protected bool $summarises = true;
+
     /**
      * Execute the console command.
      */
@@ -160,6 +162,8 @@ class Move extends BaseCommand
             );
             $this->newLine();
 
+            $this->summary->recordMove($path, $size);
+
             return true;
         }
         else
@@ -172,6 +176,8 @@ class Move extends BaseCommand
                 "Could not move file to secondary storage",
                 compact('output', 'cmd')
             );
+
+            $this->summary->recordFailure($path, 'move', $output);
 
             return false;
         }

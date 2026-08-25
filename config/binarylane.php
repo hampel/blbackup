@@ -73,6 +73,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Run summary
+    |--------------------------------------------------------------------------
+    |
+    | One Slack message per run, saying whether it worked.
+    |
+    | Different from the slack log channel in config/logging.php and
+    | complementary to it: a log channel posts a record at a time, so it can only
+    | ever report trouble - a night where everything worked produces nothing at
+    | all, which is the same silence as a cron entry nobody installed or a
+    | machine that was off. The same webhook can serve both.
+    |
+    | notify: "always", or "failure" for the bad nights only. "failure" buys
+    | quiet at the cost of the property the summary exists for, since silence
+    | stops meaning anything again.
+    |
+    */
+
+    'summary' => [
+        'slack_webhook' => env('BLBACKUP_SUMMARY_SLACK_WEBHOOK'),
+        'notify' => env('BLBACKUP_SUMMARY_NOTIFY', 'always'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Timezone
     |--------------------------------------------------------------------------
     |
