@@ -4,7 +4,7 @@ namespace App\Commands;
 
 use Carbon\CarbonInterval;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Process\ProcessResult;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;

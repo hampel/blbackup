@@ -1,0 +1,209 @@
+<?php
+
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    $this->server = fakeServer();
+    $this->image = fakeImage();
+    $this->url = 'https://images.binarylane.com.au/backup-12345.zst';
+    $this->path = backupPath();
+});
+
+/**
+ * The API as every test but one sees it: one server with one backup.
+ * Http::fake() merges stubs and the first match wins, so each test registers
+ * its own rather than inheriting one from beforeEach.
+ */
+function fakeOneBackup(array $server, array $image, string $url): void
+{
+    fakeApi($server, [$image], fakeLink($image['id'], $url));
+}
+
+function wgetCommand(string $url, string $path): Closure
+{
+    return fn (PendingProcess $process) => $process->command === "/usr/bin/wget {$url} -O {$path}";
+}
+
+function zstdCommand(string $path): Closure
+{
+    return fn (PendingProcess $process) => $process->command === "/usr/bin/zstd --test --no-progress --quiet {$path}";
+}
+
+it('downloads the latest backup for a hostname, then verifies it with zstd', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath($this->path)));
+    Process::assertRan(zstdCommand(downloadPath($this->path)));
+
+    expect(Storage::disk('downloads')->exists($this->path))->toBeTrue()
+        ->and(Storage::disk('downloads')->size($this->path))->toBe(MEGABYTE);
+});
+
+it('downloads the newest backup when a server has several', function () {
+    $older = fakeImage(['id' => 111, 'created_at' => '2026-08-18T14:30:00Z']);
+    $newer = fakeImage(['id' => 222, 'created_at' => '2026-08-20T14:30:00Z']);
+
+    fakeApi($this->server, [$older, $newer], fakeLink(222, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath(backupPath(image: 222))));
+});
+
+it('downloads a specific image id', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['--image' => 12345])
+        ->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath($this->path)));
+});
+
+it('leaves a backup alone that has already been downloaded', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('already exists')
+        ->assertSuccessful();
+
+    Process::assertNothingRan();
+});
+
+it('does not overwrite a short file, which may be an interrupted download', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    putDownload($this->path, MEGABYTE / 2);
+    fakeBinaries();
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('does not match expected')
+        ->assertSuccessful();
+
+    Process::assertNothingRan();
+
+    expect(Storage::disk('downloads')->size($this->path))->toBe((int) (MEGABYTE / 2));
+});
+
+it('re-downloads an existing file when forced', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    putDownload($this->path, MEGABYTE / 2);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com', '--force' => true])
+        ->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath($this->path)));
+
+    expect(Storage::disk('downloads')->size($this->path))->toBe(MEGABYTE);
+});
+
+it('deletes a download that fails the zstd check', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries([
+        '*wget*' => wgetWrites(MEGABYTE),
+        '*zstd*' => Process::result(errorOutput: 'zstd: corrupted block detected', exitCode: 1),
+    ]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('failed zstd test')
+        ->expectsOutputToContain('Deleting invalid backup file')
+        ->assertSuccessful();
+
+    expect(Storage::disk('downloads')->exists($this->path))->toBeFalse();
+});
+
+it('reports a download whose size does not match the API', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE / 2)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('does not match expected')
+        ->assertSuccessful();
+
+    Process::assertRan(zstdCommand(downloadPath($this->path)));
+});
+
+it('skips the download when wget fails', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => Process::result(errorOutput: 'wget: unable to resolve host', exitCode: 4)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('Could not download file')
+        ->assertSuccessful();
+
+    Process::assertNotRan(zstdCommand(downloadPath($this->path)));
+});
+
+it('moves the download to the configured remote', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries([
+        '*wget*' => wgetWrites(MEGABYTE),
+        '*lsjson*' => Process::result(errorOutput: 'directory not found', exitCode: 3),
+    ]);
+
+    $this->artisan('download', ['server' => 'web1.example.com', '--move' => true])
+        ->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => $process->command
+        === "/usr/bin/rclone --progress moveto ".downloadPath($this->path)." remote:backups/{$this->path}");
+});
+
+it('reports success when a specific image is downloaded and moved', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries([
+        '*wget*' => wgetWrites(MEGABYTE),
+        '*lsjson*' => Process::result(errorOutput: 'directory not found', exitCode: 3),
+    ]);
+
+    // the --image path is the one that propagates downloadImage()'s return
+    // value to the exit code, so a move that worked has to read as success
+    $this->artisan('download', ['--image' => 12345, '--move' => true])
+        ->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'moveto'));
+});
+
+it('does not download an image already shipped to the remote', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries([
+        '*lsjson*' => Process::result(output: json_encode(['Path' => $this->path, 'Size' => MEGABYTE])),
+    ]);
+
+    $this->artisan('download', ['server' => 'web1.example.com', '--move' => true])
+        ->expectsOutputToContain('already exists on remote')
+        ->assertSuccessful();
+
+    Process::assertNotRan(wgetCommand($this->url, downloadPath($this->path)));
+});
+
+it('downloads with the http client when --no-wget is given', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    $this->artisan('download', ['server' => 'web1.example.com', '--no-wget' => true, '--force' => true])
+        ->assertSuccessful();
+
+    Http::assertSent(fn ($request) => $request->url() === $this->url);
+
+    Process::assertNotRan(wgetCommand($this->url, downloadPath($this->path)));
+    Process::assertRan(zstdCommand(downloadPath($this->path)));
+});
+
+it('lists the available backups when given nothing to download', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    $this->artisan('download')
+        ->expectsOutputToContain('Specify a hostname, server_id or backup_id')
+        ->assertFailed();
+});

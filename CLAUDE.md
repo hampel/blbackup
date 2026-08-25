@@ -137,17 +137,55 @@ that it took. `ContextLogProcessor` is bound explicitly in `AppServiceProvider`
 because Laravel Zero does not register it, and without it `Log::withContext()`
 data never reaches the records.
 
+## Testing
+
+`tests/Feature/DownloadCommandTest.php` covers the `download` command end to
+end and is the model for testing the rest. The commands' product is the shell
+command they assemble and the file that results, so that is what is asserted:
+`Process::assertRan()` against the exact wget/zstd/rclone command string, and
+the state of the `downloads` disk afterwards.
+
+`tests/Pest.php` pins every binary path, the remote, the timezone and the API
+token in a `beforeEach` chained onto `uses()`, so assertions don't depend on the
+developer's `.env` — it also forces `logging.default` to `null`, since the
+project `.env` is loaded during tests and the suite would otherwise append to
+whatever log the developer has configured. `Storage::fake('downloads')` repoints
+the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /
+`fakeImage()` build API payloads, `fakeApi()` answers every BinaryLane endpoint
+by routing on the request path, `fakeBinaries()` fakes the external commands with
+a fall-through to success, `wgetWrites()` is a wget fake that writes the file
+wget would have written, and `backupPath()` gives the path the command derives
+for the standard fixture.
+
+Four things that will catch you out:
+
+- **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —
+  `beforeEach(...)->in('Feature')` on its own parses fine and silently never
+  runs, so the tests execute against the developer's real config.
+- **`Http::fake()` merges stubs, and the first registered match wins.** A fake
+  in `beforeEach` therefore shadows a different one set inside a test. Each test
+  here registers its own via `fakeOneBackup()`.
+- **`Http::fake()` honours the `sink` option**, so the `--no-wget` path really
+  writes the faked body to disk. That is why the fake `.zst` response body is
+  exactly `MEGABYTE` bytes.
+- **A download is accepted only if its size in GB exactly equals the API's
+  `size_gigabytes`**, so fixture sizes have to be exact in both units. Hence
+  `MEGABYTE` / `MEGABYTE_IN_GB` (0.0009765625) rather than a round decimal.
+
+Faking any of this requires the process helpers to be typed against
+`Illuminate\Contracts\Process\ProcessResult`, not the concrete
+`Illuminate\Process\ProcessResult` — `Process::run()` returns a
+`FakeProcessResult` under a fake, which implements the contract but does not
+extend the class. Keep new helpers on the contract.
+
 ## Conventions
 
 - The code uses Allman braces and its own spacing, which is **not** Laravel/PSR-12.
   Pint is in `require-dev` but there is no `pint.json`, so running it would
   reformat the entire codebase — don't run it across existing files.
 - There are no Composer scripts; run Pest directly or via `php blbackup test`.
-- `tests/` is Laravel Zero scaffolding with the stock `InspireCommandTest`
-  removed (it drove an `inspire` command this app doesn't have), leaving
-  `tests/Unit/ExampleTest.php` and a `.gitkeep` holding `tests/Feature` open —
-  `phpunit.xml.dist` names both directories and Pest exits 2 if either is
-  missing. There is no real coverage of this app's commands.
+- `phpunit.xml.dist` names both `tests/Unit` and `tests/Feature` as testsuites,
+  and Pest exits 2 if either directory is missing — don't leave one empty.
 
 ## Releasing
 
