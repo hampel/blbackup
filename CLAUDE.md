@@ -118,8 +118,9 @@ built from `Storage::disk('downloads')->path(…)`.
 Everything app-specific is env-driven through `config/binarylane.php` — API
 token, download timeout, the three binary paths, `keeponly_days`, the rclone
 remote, and the timezone. Read it through `config()`, never `env()` outside
-`config/`. `.env` is gitignored and **there is no `.env.example`**; `app:config`
-is the way to see what a given install resolved to.
+`config/`. `.env.example` documents every variable with its default; `.env`
+itself is gitignored, and `app:config` is the way to see what a given install
+resolved to.
 
 **Never put an `env()` call in `config/app.php`.** `app:build` evaluates that file
 on the build machine and compiles it in as a literal array, so the value freezes
