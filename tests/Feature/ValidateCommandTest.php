@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 /*
 | Assertions go through Artisan::call() and expect()->toContain() rather than
@@ -199,4 +201,83 @@ it('never prints the api token or the slack webhook', function () {
         ->and($output)->toContain('[ ok ] Slack webhook')
         ->not->toContain('SECRET/WEBHOOK/VALUE')
         ->not->toContain('test-token');
+});
+
+it('writes a record through the configured channel, not just checking it is writable', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    Log::spy();
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('one info record written');
+
+    Log::shouldHaveReceived('log')->with('info', 'app:validate test record', ['level' => 'info']);
+});
+
+it('writes one record at every level with --logs', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    Log::spy();
+
+    [$exit, $output] = validate(['--logs' => true]);
+
+    expect($exit)->toBe(0)->and($output)->toContain('8 records written, one at every level');
+
+    foreach (['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'] as $level)
+    {
+        Log::shouldHaveReceived('log')->with($level, 'app:validate test record', ['level' => $level]);
+    }
+});
+
+it('does not try to write records when the destination is unwritable', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => '/no/such/directory/blbackup.log']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] Log file (single)')
+        ->toContain('[    ] Log records')
+        ->toContain('cannot be written');
+});
+
+it('does not exercise a transfer unless one is asked for', function () {
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('[    ] Download transfer');
+
+    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '.zst'));
+});
+
+it('downloads a url end to end with --download', function () {
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate(['--download' => 'https://images.binarylane.com.au/probe.zst']);
+
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] Download transfer');
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), 'probe.zst'));
+
+    // the probe file must not be left behind on the download disk
+    expect(Storage::disk('downloads')->allFiles(''))->toBe([]);
+});
+
+it('fails when the transfer cannot be made', function () {
+    // the only fake registered, because fakeApi() answers .zst with a
+    // successful body and the first registered stub wins
+    Http::fake(['*' => Http::response('nope', 404)]);
+
+    [$exit, $output] = validate([
+        '--download' => 'https://images.binarylane.com.au/probe.zst',
+        '--no-api' => true,
+    ]);
+
+    expect($exit)->toBe(1)->and($output)->toContain('[fail] Download transfer');
+
+    expect(Storage::disk('downloads')->allFiles(''))->toBe([]);
 });

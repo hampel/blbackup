@@ -17,8 +17,9 @@ this app.
 ```bash
 php blbackup                     # default: summary list of all commands
 php blbackup app:config          # resolved config (timeouts, binaries, remote, disks, logging)
-php blbackup app:test --logs     # write one message at each level, then dump logging config
-php blbackup app:test --download=<url>   # exercise the Http download path against a URL
+php blbackup app:validate        # run the binaries, list the remote, call the API, write a log record
+php blbackup app:validate --logs # also write one record at every level
+php blbackup app:validate --download=<url>  # also pull a real URL through the download path
 
 php blbackup account             # BinaryLane account info — cheapest API token check
 php blbackup servers [host|id] [--ids|--names]
@@ -66,6 +67,25 @@ for the whole command, logs and prints them, and returns FAILURE — so command
 code calls `$this->api->…` straight, with no try/catch. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
+
+**`app:validate` is the command to extend when a new dependency on the
+environment appears.** It exercises rather than describes: it runs each
+configured binary, lists the rclone remote, calls the API, write-probes the
+download directory and writes a real log record. Four outcomes — `[ ok ]`,
+`[warn]`, `[fail]`, and a blank marker for a check that did not apply, which is
+deliberately not a pass — and a non-zero exit if anything failed, so an image
+rebuild can be gated on it. It renders its own output rather than using
+`twoColumnDetail()`, whose `EnsureRelativePaths` mutator would print absolute
+paths as convincing relative ones, and it prints no credential: the API token
+and the Slack webhook report as set, never as their value.
+
+Two things it has to defend against, both of which bit while it was written.
+Reporting a failure writes to the log, so validating an unwritable log
+destination died inside Monolog until every write from this command was guarded
+and the channel dropped once known bad — `Log::forgetChannels()` cannot do that,
+because closing a stream handler opens the stream that could not be opened.
+And that exposure is not this command's alone: `App\Api` logs every call, so an
+unwritable log path takes any command down on its first API call.
 
 **A mistyped command must exit non-zero, and that took an override.**
 `App\Kernel` narrows `LaravelZero\Framework\Kernel::ensureDefaultCommand()` so
@@ -124,8 +144,8 @@ it breaks the redraw (see the `Log::debug` in `Create::backup()` for the pattern
 
 **Downloads default to `wget`, not the Http client.** `--no-wget` switches to
 `Api::download()` (Guzzle sink + progress callback), the original implementation.
-`app:test --download` duplicates that Http path inline rather than calling
-`Api::download()`, so it can be pointed at an arbitrary URL.
+`app:validate --download=<url>` exercises that same
+`Api::download()` path against an arbitrary URL.
 
 **Filenames encode the source.** Downloads land at
 `<download disk>/<server name>/backup-<short name>-<Ymd-His>-<image id>.zst`,
@@ -164,8 +184,11 @@ timezone lives as `binarylane.timezone` and is applied with
 and the default download path relative to the working directory.
 
 **Logging is off by default** — `logging.default` is `null`. A real install sets
-`LOG_CHANNEL`/`LOG_STACK` and `LOG_STORAGE_PATH`; `app:test --logs` is the check
-that it took. `ContextLogProcessor` is bound explicitly in `AppServiceProvider`
+`LOG_CHANNEL`/`LOG_STACK` and `LOG_STORAGE_PATH`; `app:validate` is the check
+that it took — it writes a real record through the configured channel rather
+than reporting that the file looks writable, and `--logs` writes one at every
+level, which is how you see what a destination with a threshold (Slack at
+`critical`) actually receives. `ContextLogProcessor` is bound explicitly in `AppServiceProvider`
 because Laravel Zero does not register it, and without it `Log::withContext()`
 data never reaches the records.
 

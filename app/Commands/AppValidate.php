@@ -7,6 +7,8 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
+use Symfony\Component\Console\Helper\ProgressBar;
 
 class AppValidate extends BaseCommand
 {
@@ -16,7 +18,9 @@ class AppValidate extends BaseCommand
      * @var string
      */
     protected $signature = 'app:validate
-                            {--no-api : skip the checks that call the BinaryLane API}';
+                            {--no-api : skip the checks that call the BinaryLane API}
+                            {--logs : write a record at every level, to see what each destination really receives}
+                            {--d|download= : download this URL to the download path, to exercise the transfer end to end}';
 
     /**
      * The console command description.
@@ -31,6 +35,12 @@ class AppValidate extends BaseCommand
      * Whether any check has failed, which decides the exit code.
      */
     protected bool $failed = false;
+
+    /**
+     * Set once the log destination is known to be unwritable, so nothing tries
+     * to write to it again.
+     */
+    protected bool $loggingStopped = false;
 
     /**
      * Execute the console command.
@@ -54,6 +64,7 @@ class AppValidate extends BaseCommand
 
         $this->section("BinaryLane API");
         $this->checkApi();
+        $this->checkDownload();
 
         $this->newLine();
 
@@ -154,6 +165,50 @@ class AppValidate extends BaseCommand
         {
             $this->checkLogChannel(trim($name));
         }
+
+        $this->checkLogRecords();
+    }
+
+    /**
+     * Write real records through the configured channel.
+     *
+     * Checking the file is writable describes the logging; writing to it
+     * exercises it, which is the difference between this command and
+     * app:config. --logs writes one at every level, which is how you see what a
+     * destination with a threshold - Slack at critical, say - actually receives.
+     */
+    protected function checkLogRecords() : void
+    {
+        if ($this->loggingStopped)
+        {
+            $this->reportSkip("Log records", "not written - the destination above cannot be written");
+
+            return;
+        }
+
+        $levels = $this->option('logs')
+            ? ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency']
+            : ['info'];
+
+        foreach ($levels as $level)
+        {
+            try
+            {
+                Log::log($level, "app:validate test record", ['level' => $level]);
+            }
+            catch (\Throwable $e)
+            {
+                $this->reportFail("Log records", "writing a {$level} record failed: {$e->getMessage()}");
+
+                return;
+            }
+        }
+
+        $written = count($levels) === 1
+            ? "one info record written"
+            : count($levels) . " records written, one at every level";
+
+        $this->reportOk("Log records", $written);
     }
 
     protected function checkLogChannel(string $name) : void
@@ -293,6 +348,8 @@ class AppValidate extends BaseCommand
         // could not open in the first place, and throws. Log resolves the
         // default driver from config on each call, so this is enough.
         config(['logging.default' => 'null']);
+
+        $this->loggingStopped = true;
     }
 
     /**
@@ -310,6 +367,74 @@ class AppValidate extends BaseCommand
         {
             // reported by checkLogging() as a failed check in its own right
         }
+    }
+
+    /**
+     * Exercise the download path end to end against a real URL.
+     *
+     * Off unless asked for: it moves real bytes, and the URL has to come from
+     * somewhere. A BinaryLane backup link from `blbackup backups --urls` is the
+     * realistic one, but any URL exercises the same code - the Http client, the
+     * sink, the configured timeout and the retry.
+     */
+    protected function checkDownload() : void
+    {
+        $url = $this->option('download');
+
+        if (empty($url))
+        {
+            $this->reportSkip("Download transfer", "not exercised - pass --download=<url> to try a real transfer");
+
+            return;
+        }
+
+        $path = '.blbackup-validate-download';
+
+        $this->line("  Downloading [{$url}]");
+
+        $progress = new ProgressBar($this->output, 100);
+        $progress->start();
+
+        $start = now();
+
+        try
+        {
+            $this->api->download(
+                $url,
+                Storage::disk('downloads')->path($path),
+                function ($downloadTotal, $downloadedBytes) use ($progress) {
+                    if ($downloadTotal > 0)
+                    {
+                        $progress->setProgress(intval(round(($downloadedBytes / $downloadTotal) * 100)));
+                    }
+                }
+            );
+
+            $progress->finish();
+            $this->newLine(2);
+        }
+        catch (BinaryLaneException | ConnectionException $e)
+        {
+            $this->newLine(2);
+
+            Storage::disk('downloads')->delete($path);
+
+            $this->reportFail("Download transfer", $e->getMessage());
+
+            return;
+        }
+
+        $bytes = Storage::disk('downloads')->size($path);
+        $seconds = max($start->diffInSeconds(now()), 0.001);
+
+        Storage::disk('downloads')->delete($path);
+
+        $this->reportOk("Download transfer", sprintf(
+            '%s in %ss (%s MB/s)',
+            $this->formatBytes($bytes),
+            Number::format($seconds, 1),
+            Number::format(($bytes / (1024 * 1024)) / $seconds, 1)
+        ));
     }
 
     protected function reportOk(string $label, string $detail = '') : void
