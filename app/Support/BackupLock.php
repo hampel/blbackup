@@ -99,8 +99,6 @@ class BackupLock
 
     public function path() : string
     {
-        $path = trim((string) config('binarylane.lock_file'));
-
-        return $path === '' ? storage_path('blbackup.lock') : $path;
+        return config('binarylane.lock_file');
     }
 }

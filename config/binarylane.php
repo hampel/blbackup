@@ -52,9 +52,13 @@ return [
     | In a container this MUST name a path on a shared mount. Each
     | `docker compose run` gets its own filesystem, so a lock inside the image
     | is a lock two concurrent runs cannot see each other holding.
+    |
+    | The default is resolved here rather than in BackupLock, so that this file
+    | and .env.example agree about what it is - they did not, and an operator
+    | reading .env.example took its container example for the default.
     */
 
-    'lock_file' => env('LOCK_FILE', ''),
+    'lock_file' => env('LOCK_FILE') ?: storage_path('blbackup.lock'),
 
     /*
     |--------------------------------------------------------------------------

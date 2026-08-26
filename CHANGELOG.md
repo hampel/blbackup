@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`.env.example` showed an example as though it were the default**, in three
+  places. Its header promised every setting was shown with the default it takes
+  when left unset, and `LOCK_FILE=/logs/blbackup.lock`, `LOG_STACK=single,slack`
+  and `LOG_HOSTNAME=unraid` were none of them defaults. The first cost real time:
+  it read as though the lock was already on a shared mount, when the default put
+  it inside the container where it does nothing. Lines that cannot show a default
+  are now marked EXAMPLE and say what the default really is.
+- The lock file default moved from `BackupLock` into `config/binarylane.php`,
+  so the file declaring the setting is the file that says what it defaults to.
+  There is a test now that `.env.example` and `config/` name the same settings.
 - **The container had no `/app/storage`, and every rclone call runs from
   there.** `.dockerignore` excludes `/storage` deliberately - it holds a working
   checkout's downloads, logs and compiled phar - but nothing then created the
