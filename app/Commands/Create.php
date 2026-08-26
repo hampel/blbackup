@@ -34,8 +34,6 @@ class Create extends BaseCommand
 
     protected string $commandContext = 'create';
 
-    protected bool $summarises = true;
-
     /**
      * Execute the console command.
      */

@@ -28,8 +28,6 @@ class Check extends BaseCommand
 
     protected string $commandContext = 'check';
 
-    protected bool $summarises = true;
-
     /**
      * Execute the console command.
      */

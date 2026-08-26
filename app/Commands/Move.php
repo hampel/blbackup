@@ -32,8 +32,6 @@ class Move extends BaseCommand
 
     protected string $commandContext = 'move';
 
-    protected bool $summarises = true;
-
     /**
      * Execute the console command.
      */

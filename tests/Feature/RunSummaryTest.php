@@ -8,6 +8,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Hampel\SlackMessage\SlackWebhook;
+use Illuminate\Support\Facades\Process;
 
 /*
 | Faked at the HTTP client, not at the sender: the payload is what this code
@@ -130,6 +131,18 @@ it('sends nothing when no webhook is configured', function () {
     expect(reporter($history, webhook: '')->shouldSend($summary))->toBeFalse();
 });
 
+it('sends nothing for a run the operator cancelled', function () {
+    $history = [];
+    $summary = new RunSummary;
+    $summary->claim('clean');
+    $summary->cancel();
+
+    // clean is the only command that asks before it acts, and "Backup completed"
+    // with no counts, delivered to the channel of the person who just answered
+    // no, is worse than saying nothing at all
+    expect(reporter($history)->shouldSend($summary))->toBeFalse();
+});
+
 it('sends a good run only when notify is always', function () {
     $history = [];
     $summary = new RunSummary;
@@ -188,8 +201,9 @@ it('formats durations at the boundaries', function () {
 });
 
 /*
-| The wiring: which command posts, how many messages a nested run produces, and
-| that Slack cannot change the outcome of the work.
+| The wiring: cron is the only command that posts, a whole run produces one
+| message however many stages it ran, and Slack cannot change the outcome of
+| the work. Stages run by hand say nothing - somebody is already watching them.
 */
 
 function interceptSummary(array &$history, string $notify = 'always', string $webhook = 'https://hooks.slack.test/abc', array $responses = null): void
@@ -206,22 +220,25 @@ it('posts one summary for a run, not one per stage', function () {
     interceptSummary($history);
 
     fakeApi([fakeServer()], [fakeImage()], fakeLink(12345, 'https://images.binarylane.com.au/backup-12345.zst'));
-    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+    fakeBinaries([
+        '*wget*' => wgetWrites(MEGABYTE),
+        '*lsjson*' => Process::result(rcloneListing([])),
+    ]);
 
-    $this->artisan('create', ['server' => 'web1.example.com', '--download' => true])
-        ->assertSuccessful();
+    $this->artisan('cron')->assertSuccessful();
 
-    // create claims the run; the download it calls sees it taken and stays quiet
+    // cron claims the run; every stage it calls sees it taken and stays quiet
     expect($history)->toHaveCount(1);
 
     $fields = collect(sentPayload($history)['attachments'][0]['fields'])->pluck('value', 'title');
 
     expect(sentPayload($history)['text'])->toBe('Backup completed on unraid')
         ->and($fields['Backups taken'])->toBe('1')
-        ->and($fields['Downloaded'])->toBe('1 (1.0 MB)');
+        ->and($fields['Downloaded'])->toBe('1 (1.0 MB)')
+        ->and($fields['Moved to remote'])->toBe('1');
 });
 
-it('posts a summary when a command is run on its own', function () {
+it('says nothing when a stage is run by hand', function () {
     $history = [];
     interceptSummary($history);
 
@@ -230,9 +247,9 @@ it('posts a summary when a command is run on its own', function () {
 
     $this->artisan('move', ['file' => backupPath()])->assertSuccessful();
 
-    expect($history)->toHaveCount(1)
-        ->and(collect(sentPayload($history)['attachments'][0]['fields'])->pluck('value', 'title')['Moved to remote'])
-        ->toBe('1');
+    // somebody is sitting watching this one, and the summary would be delivered
+    // to their own channel to tell them what they just watched happen
+    expect($history)->toBeEmpty();
 });
 
 it('reports the failure a run recorded', function () {
@@ -241,7 +258,7 @@ it('reports the failure a run recorded', function () {
 
     fakeApi([fakeServer()], statuses: [fakeAction('errored', 40)]);
 
-    $this->artisan('create', ['server' => 'web1.example.com'])->assertFailed();
+    $this->artisan('cron', ['--no-clean' => true])->assertFailed();
 
     expect(sentPayload($history)['text'])->toBe('Backup failed on unraid')
         ->and(sentPayload($history)['attachments'][0]['text'])->toContain('web1.example.com (create): backup errored');
@@ -251,10 +268,11 @@ it('does not fail the run when slack refuses the summary', function () {
     $history = [];
     interceptSummary($history, responses: [new Response(500, [], 'server error')]);
 
-    fakeApi([fakeServer()]);
+    fakeApi([fakeServer()], [fakeImage()], fakeLink(12345, 'https://images.binarylane.com.au/backup-12345.zst'));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
 
     // the work succeeded; whether Slack heard about it does not change that
-    $this->artisan('create', ['server' => 'web1.example.com'])
+    $this->artisan('cron', ['--no-clean' => true])
         ->expectsOutputToContain('Could not send the run summary')
         ->assertSuccessful();
 });
@@ -279,7 +297,7 @@ it('reports a run that could not start at all', function () {
 
     // nothing ran, so nothing logged anything worth summarising - this is the
     // failure that otherwise leaves one log line and no alert
-    $this->artisan('create', ['server' => 'nothing.example.com'])->assertFailed();
+    $this->artisan('cron', ['--no-clean' => true])->assertFailed();
 
     expect($history)->toHaveCount(1);
 
@@ -296,7 +314,9 @@ it('reports an unreadable server list as a run that did not start', function () 
 
     fakeApi([fakeServer()]);
 
-    $this->artisan('create', ['--all' => true, '--include' => '/no/such/list.txt'])->assertFailed();
+    // the stage that could not start is the one with something to say, and cron
+    // is the one that owns the run - so the block has to cross that boundary
+    $this->artisan('cron', ['--include' => '/no/such/list.txt', '--no-clean' => true])->assertFailed();
 
     expect(sentPayload($history)['text'])->toBe('Backup did not run on unraid')
         ->and(sentPayload($history)['attachments'][0]['text'])->toContain('/no/such/list.txt');
@@ -317,21 +337,4 @@ it('keeps what a run did when it fails part way through', function () {
 
     expect($summary->hasWork())->toBeTrue()
         ->and($summary->blockedBy())->toBeNull();
-});
-
-it('posts nothing when the operator cancels at the confirmation prompt', function () {
-    $history = [];
-    interceptSummary($history);
-
-    putAgedDownload('web1.example.com/backup-web1-20240101-120000-12345.zst', daysAgo: 30);
-    fakeBinaries();
-
-    $this->artisan('clean')
-        ->expectsConfirmation('This operation cannot be undone. Continue ?', 'no')
-        ->assertSuccessful();
-
-    // "Backup completed" with no counts, sent to the channel of the person who
-    // just answered no, is worse than saying nothing at all
-    expect($history)->toBeEmpty()
-        ->and(app(App\Support\RunSummary::class)->wasCancelled())->toBeTrue();
 });

@@ -39,8 +39,6 @@ class Download extends BaseCommand
 
     protected string $commandContext = 'download';
 
-    protected bool $summarises = true;
-
     /**
      * Execute the console command.
      */

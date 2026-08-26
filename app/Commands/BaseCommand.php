@@ -21,7 +21,11 @@ abstract class BaseCommand extends Command
 
     /**
      * Whether this command reports a run summary when it is the one invoked.
-     * The listing commands do not: nothing was done to report.
+     *
+     * Only cron does. Every stage can be run by hand, and a summary posted for a
+     * command somebody is sitting and watching is noise delivered to the channel
+     * of the person watching it - so posting belongs to the unattended entry
+     * point rather than to a guess about whether anyone is there.
      */
     protected bool $summarises = false;
 
@@ -139,10 +143,15 @@ abstract class BaseCommand extends Command
      * Recorded as a block only when the run had not done anything yet - a fail()
      * after real work is a failure within a run, and reporting it as "did not
      * run" would throw away everything the run did manage.
+     *
+     * Recorded by whichever command failed, not only the one that owns the run:
+     * cron owns it, and the stage that could not start is the one with something
+     * to say. Nothing is recorded when no command has claimed a run at all, which
+     * is a stage somebody is running by hand.
      */
     protected function recordFailedStart(string $message) : void
     {
-        if (!isset($this->summary) || !$this->ownsRun)
+        if (!isset($this->summary) || $this->summary->ownedBy() === null)
         {
             return;
         }

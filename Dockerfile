@@ -56,6 +56,6 @@ COPY . .
 RUN composer dump-autoload --no-dev --optimize
 
 # No command by default prints the command list and exits 0 - cron supplies the
-# command it wants, eg:
-#   docker compose run --rm blbackup php blbackup create --all --download --move
+# command it wants, which for a nightly run is:
+#   docker compose run --rm blbackup php blbackup cron
 CMD ["php", "blbackup"]

@@ -20,6 +20,7 @@ php blbackup app:config          # resolved config (timeouts, binaries, remote, 
 php blbackup app:validate        # run the binaries, list the remote, call the API, write logs at every level
 php blbackup app:validate --download=<url>  # also pull a real URL through the download path
 
+php blbackup cron                # the whole run, for a single crontab line
 php blbackup account             # BinaryLane account info — cheapest API token check
 php blbackup servers [host|id] [--ids|--names]
 php blbackup backups [host|id] [--ids] [--urls]
@@ -50,8 +51,23 @@ call each other through `$this->call()` rather than sharing code:
   the download if the zstd test fails; then calls `move` if `--move` is set.
 - `clean --remote` expires the rclone side as well as the local disk.
 
-So a scheduled full run is `create --all --download --move` followed by
-`clean --remote --no-interaction`.
+**`cron` is the entry point for an unattended run**, and the only command that
+posts a run summary. It runs `create --all --download` and then `clean`, and
+decides two things from configuration rather than from flags:
+
+- **`--move` is gated on `RCLONE_REMOTE` being set.** An installation that can
+  run on the machine holding the backups has nowhere to move them to, and
+  unsetting one variable is the whole of that change. `--no-move` forces
+  download-only for one run.
+- **`clean --remote` is gated on the same variable**, but not on `--move`:
+  what previous nights shipped there still ages, whatever tonight did.
+
+It never prompts — `clean` is called with `--no-interaction`, because a
+`confirm()` with no stdin to read is an exception rather than a default. There is
+deliberately no `--dry-run`: `check`, `move` and `clean` have one but `create`
+and `download` do not, so it would really take a snapshot and really pull it
+down. A stage that fails does not stop the ones after it, and any failure makes
+the whole run exit non-zero.
 
 ## Architecture
 
@@ -114,10 +130,17 @@ this?" prompt otherwise waits on stdin and hangs the suite.
 **The run summary is a notification, not a log record.** `App\Support\RunSummary`
 is a container singleton — for the same reason the stages need one, since
 `create` calls `download` and `download` calls `move`, and the thing being
-summarised is the run rather than any one command. `BaseCommand` claims the run
-for whichever command was invoked (`$summarises` is false on the listing
-commands, which have nothing to report), records what each stage produced and
-each failure, and posts once at the end. `App\Support\SlackSummary` renders it
+summarised is the run rather than any one command. `$summarises` is true on `cron`
+alone: every stage can be run by hand, and a summary posted for a command
+somebody is sitting and watching is noise delivered to the channel of the person
+watching it. Posting therefore belongs to the unattended entry point rather than
+to a guess about whether anyone is there — and Symfony is no help with that
+guess anyway, since `isInteractive()` is only cleared by `--no-interaction` or
+`--quiet` and so reports true under cron. `BaseCommand` claims the run, records
+what each stage produced and each failure, and posts once at the end.
+`recordFailedStart()` records against whoever owns the run, not only the owner
+itself: `cron` owns it and the stage that could not start is the one with
+something to say. `App\Support\SlackSummary` renders it
 and sends it with `hampel/slack-message`, which needs only a PSR-18 client —
 Guzzle is already a `laravel-zero/framework` dependency, so it costs one package
 rather than the 25 `illuminate/notifications` would.

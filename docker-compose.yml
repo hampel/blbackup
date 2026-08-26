@@ -2,7 +2,12 @@
 # service here, so `docker compose run --rm` rather than `up`:
 #
 #   0 2 * * * cd /mnt/user/appdata/blbackup && \
-#             docker compose run --rm blbackup php blbackup create --all --download --move --no-interaction >> /mnt/user/logs/blbackup/cron.log 2>&1
+#             docker compose run --rm blbackup php blbackup cron >> /mnt/user/logs/blbackup/cron.log 2>&1
+#
+# `cron` is the whole run - back up, download, move, expire - and the only
+# command that posts a Slack run summary. Whether the downloads are moved to
+# secondary storage is decided by RCLONE_REMOTE: set, and they are moved there
+# and expired there; unset, and they stay on this machine. Nothing else changes.
 #
 # After any image rebuild:
 #
