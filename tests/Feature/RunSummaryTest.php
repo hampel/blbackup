@@ -318,3 +318,20 @@ it('keeps what a run did when it fails part way through', function () {
     expect($summary->hasWork())->toBeTrue()
         ->and($summary->blockedBy())->toBeNull();
 });
+
+it('posts nothing when the operator cancels at the confirmation prompt', function () {
+    $history = [];
+    interceptSummary($history);
+
+    putAgedDownload('web1.example.com/backup-web1-20240101-120000-12345.zst', daysAgo: 30);
+    fakeBinaries();
+
+    $this->artisan('clean')
+        ->expectsConfirmation('This operation cannot be undone. Continue ?', 'no')
+        ->assertSuccessful();
+
+    // "Backup completed" with no counts, sent to the channel of the person who
+    // just answered no, is worse than saying nothing at all
+    expect($history)->toBeEmpty()
+        ->and(app(App\Support\RunSummary::class)->wasCancelled())->toBeTrue();
+});

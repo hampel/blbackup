@@ -54,6 +54,13 @@ class SlackSummary
             return false;
         }
 
+        // nothing was done and somebody was there to decide that, so the channel
+        // would be reporting a night's backup to the person who just cancelled it
+        if ($summary->wasCancelled())
+        {
+            return false;
+        }
+
         // "failure" is for an installation that would rather have silence than a
         // nightly all-clear - at the cost of not being able to tell a working
         // backup from an uninstalled one, which is the whole point of a summary

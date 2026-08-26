@@ -50,12 +50,26 @@ class Clean extends BaseCommand
         {
             $this->line("Dry-run only");
         }
-        else
+        elseif ($this->input->isInteractive() && !$this->confirm("This operation cannot be undone. Continue ?"))
         {
-            if (!$this->option('no-interaction') && !$this->confirm("This operation cannot be undone. Continue ?")) {
-                $this->line("Operation aborted by user");
-                return self::SUCCESS;
-            }
+            // isInteractive() rather than the --no-interaction flag, because that is
+            // the state confirm() itself obeys - --quiet clears it too, and Symfony
+            // throws rather than assuming a default when stdin cannot be read
+
+            $this->log(
+                'notice',
+                "Cancelled at the confirmation prompt - nothing was deleted",
+                "Clean cancelled at the confirmation prompt",
+                compact('path', 'keeponly')
+            );
+
+            $this->line("Run <comment>clean --dry-run</comment> to see which files would be deleted.");
+
+            // a run called off by hand is not one to tell Slack about - reaching the
+            // prompt at all means somebody was watching, and they know what they did
+            $this->summary->cancel();
+
+            return self::SUCCESS;
         }
 
         $cutoff = Carbon::now()->subDays($keeponly)->timestamp;

@@ -52,7 +52,8 @@ it('deletes nothing when the confirmation is declined', function () {
 
     $this->artisan('clean')
         ->expectsConfirmation(CONFIRMATION, 'no')
-        ->expectsOutputToContain('Operation aborted by user')
+        ->expectsOutputToContain('Cancelled at the confirmation prompt - nothing was deleted')
+        ->expectsOutputToContain('clean --dry-run')
         ->assertSuccessful();
 
     expect(Storage::disk('downloads')->exists($this->old))->toBeTrue();

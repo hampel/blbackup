@@ -23,6 +23,8 @@ class RunSummary
 
     protected ?string $blockedBy = null;
 
+    protected bool $cancelled = false;
+
     /**
      * The command that owns this run and will report it. The stages it calls
      * see that it is taken and leave it alone.
@@ -105,6 +107,23 @@ class RunSummary
     public function blockedBy() : ?string
     {
         return $this->blockedBy;
+    }
+
+    /**
+     * The operator called the run off at a confirmation prompt.
+     *
+     * Neither a failure nor a block: nothing went wrong and nothing was missing -
+     * somebody answered no. Recorded so that no summary is sent, since a run that
+     * reached a prompt had a person watching it who already knows how it went.
+     */
+    public function cancel() : void
+    {
+        $this->cancelled = true;
+    }
+
+    public function wasCancelled() : bool
+    {
+        return $this->cancelled;
     }
 
     public function isDryRun() : bool

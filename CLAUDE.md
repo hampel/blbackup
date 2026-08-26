@@ -126,6 +126,16 @@ Sending happens in a `finally` and can never fail the run: whether Slack heard
 about the work does not change whether the work succeeded. A failed send logs a
 warning and leaves the exit code alone.
 
+**A run the operator called off does not report.** `clean` is the only command
+that asks before it acts, and answering no used to post `Backup completed` with
+no counts to the channel of the person who had just cancelled it.
+`RunSummary::cancel()` marks that, and `SlackSummary::shouldSend()` declines —
+it is neither a failure nor a block, because nothing went wrong and nothing was
+missing. The gate on the prompt is `$this->input->isInteractive()`, not the
+`--no-interaction` flag: that is the state `confirm()` itself obeys, `--quiet`
+clears it too, and when it is set but stdin cannot be read Symfony throws rather
+than silently taking the default.
+
 **`SlackSummary` reads no config and resolves nothing.** Webhook, notify policy,
 application string and hostname all arrive through its constructor, and
 `AppServiceProvider` does the reading. Keep it that way — if a new setting is
