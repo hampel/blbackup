@@ -70,3 +70,18 @@ it('still runs a command that does exist', function () {
 
     expect($exit)->toBe(0)->and($output)->toContain('web1.example.com');
 });
+
+it('refuses the scheduler commands, which this application does not use', function () {
+    // hidden is not removed: a hidden schedule:run stays runnable, prints "No
+    // scheduled commands are ready to run" and exits 0 - a clean success from a
+    // command that does nothing, in a tool whose exit code is all cron reads
+    foreach (['schedule:run', 'schedule:list', 'schedule:finish'] as $command)
+    {
+        [$exit, $output] = runKernel($command);
+
+        // Symfony names the namespace rather than the command, which is itself
+        // the evidence: there is no "schedule" namespace left to define it in
+        expect($exit)->not->toBe(0)
+            ->and($output)->toContain('There are no commands defined in the "schedule" namespace');
+    }
+});

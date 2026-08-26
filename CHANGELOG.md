@@ -30,6 +30,14 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - The lock file default moved from `BackupLock` into `config/binarylane.php`,
   so the file declaring the setting is the file that says what it defaults to.
   There is a test now that `.env.example` and `config/` name the same settings.
+- **`blbackup schedule:run` exited 0 having done nothing.** Laravel Zero's
+  scheduler commands were listed as `hidden` rather than `remove`, and hidden is
+  not removed - a hidden command is absent from the command list and still runs.
+  This application does not use the scheduler, so that was a clean success from
+  a command with nothing to do, in a tool whose exit code is the whole of what
+  cron reads: a crontab copied from another Laravel Zero app would have backed
+  up nothing and reported success for as long as nobody looked. `schedule:run`,
+  `schedule:list` and `schedule:finish` are now removed outright.
 - **The container had no `/app/storage`, and every rclone call runs from
   there.** `.dockerignore` excludes `/storage` deliberately - it holds a working
   checkout's downloads, logs and compiled phar - but nothing then created the

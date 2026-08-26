@@ -58,9 +58,6 @@ return [
         NunoMaduro\LaravelConsoleSummary\SummaryCommand::class,
         Symfony\Component\Console\Command\DumpCompletionCommand::class,
         Symfony\Component\Console\Command\HelpCommand::class,
-        Illuminate\Console\Scheduling\ScheduleRunCommand::class,
-        Illuminate\Console\Scheduling\ScheduleListCommand::class,
-        Illuminate\Console\Scheduling\ScheduleFinishCommand::class,
         Illuminate\Foundation\Console\VendorPublishCommand::class,
         LaravelZero\Framework\Commands\StubPublishCommand::class,
     ],
@@ -77,7 +74,29 @@ return [
     */
 
     'remove' => [
-        //
+        /*
+         * Removed rather than hidden, which is the whole point: a hidden command
+         * is absent from the command list and still runs. `blbackup schedule:run`
+         * printed "No scheduled commands are ready to run" and exited 0 - a
+         * perfectly clean success from a command that does nothing and that this
+         * application has no use for, in a tool whose exit code is the whole of
+         * what cron reads. A crontab copied from another Laravel Zero app would
+         * back up nothing and report success for as long as nobody looked.
+         *
+         * The scheduler could not run these commands anyway: a due event resolves
+         * Illuminate\Log\Context\Repository, which needs a trait from
+         * illuminate/queue that a console application does not install, and in a
+         * compiled binary the working directory it hands Symfony Process is a
+         * phar:// path that Process rejects. ScheduleRunCommand swallows both and
+         * exits 0 regardless.
+         *
+         * The schedule() methods on the commands are left in place, commented
+         * out, so the next person can see the decision rather than wonder.
+         * `blbackup cron` is what a crontab calls.
+         */
+        Illuminate\Console\Scheduling\ScheduleRunCommand::class,
+        Illuminate\Console\Scheduling\ScheduleListCommand::class,
+        Illuminate\Console\Scheduling\ScheduleFinishCommand::class,
     ],
 
 ];
