@@ -78,6 +78,9 @@ below follows from fixing that.
 
 ### Changed
 
+- **Laravel Zero 13** (Illuminate 13), up from 12. No application code changed:
+  the whole suite passed on the new framework unaltered, including the narrowed
+  console kernel, and a live `app:validate` run confirmed it outside the fakes.
 - **Exit codes are now the contract with cron.** Every command that works
   through a list keeps going past a failure and reports at the end, so what is
   reported is everything that went wrong rather than the first thing. `create`

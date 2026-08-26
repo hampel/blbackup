@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`blbackup` is a BinaryLane VPS backup CLI built on Laravel Zero 12 (PHP 8.2+). It
+`blbackup` is a BinaryLane VPS backup CLI built on Laravel Zero 13 (PHP 8.3+). It
 drives the BinaryLane API to take temporary server snapshots, then shells out to
 `wget`, `zstd` and `rclone` to download, verify, ship and expire the resulting
 compressed disk images.
