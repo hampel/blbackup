@@ -10,3 +10,9 @@ storage/
 builds/
 CLAUDE.local.md
 rclone.conf
+
+# NTFS alternate data stream left behind when a file is copied from Windows into
+# WSL - it records the zone the download came from and is of no use here. Also
+# covered by ~/.config/git/ignore on this machine, which a clone elsewhere would
+# not have.
+*:Zone.Identifier
