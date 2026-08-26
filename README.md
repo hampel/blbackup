@@ -1,5 +1,7 @@
 # blbackup
 
+[![ci](https://github.com/hampel/blbackup/actions/workflows/ci.yml/badge.svg)](https://github.com/hampel/blbackup/actions/workflows/ci.yml)
+
 Backup for [BinaryLane](https://www.binarylane.com.au/) VPS servers. `blbackup`
 asks the BinaryLane API for a temporary snapshot of a server, downloads the
 resulting compressed disk image, verifies it, ships it to cloud storage and
@@ -280,6 +282,13 @@ composer install
 composer test                     # or: php blbackup test
 php vendor/bin/pest --filter='some name'
 ```
+
+CI runs three jobs on every push: the suite, a **build of the container image
+with `app:validate --no-api` run inside it**, and a compiled binary. The middle
+one is there because the `Dockerfile` had never been built anywhere but the
+production server, so its first execution was always on the machine taking the
+backups — and two defects reached it that way. `--no-api` needs no credentials
+and still exercises every binary, path and dependency.
 
 The suite fakes at the process, HTTP client and filesystem boundaries and
 asserts on what the commands actually produce — the exact shell command string,

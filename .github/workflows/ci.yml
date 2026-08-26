@@ -1,0 +1,120 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+# One run per branch or PR. A push that lands while an earlier one is still
+# going makes the earlier one irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.3 is the floor composer.json declares and what the container runs.
+        # Nothing runs this tool on anything newer yet; add a version here when
+        # something does, rather than testing a platform nobody deploys on.
+        php: ['8.3']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: intl
+          coverage: none
+
+      - uses: ramsey/composer-install@v3
+
+      - run: php vendor/bin/pest
+
+  container:
+    name: container image
+    runs-on: ubuntu-latest
+
+    # This job is the reason this file exists. The Dockerfile had never been
+    # built anywhere but the production server, so its first execution was
+    # always on the machine that takes the backups - and two defects reached it
+    # that way: rclone installed somewhere the configured path did not point,
+    # and a missing /app/storage that made every rclone call refuse to start.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t blbackup:ci .
+
+      - name: The machine can do what the configuration says
+        # --no-api keeps this off the BinaryLane API and off Slack, so it needs
+        # no credentials - and still runs every binary, takes the lock, probes
+        # the download path and writes a real log record at every level. The
+        # token is only checked for presence, never used.
+        run: |
+          docker run --rm \
+            -e BINARYLANE_API_TOKEN=ci-token-never-used \
+            -e LOG_STACK=single \
+            -e LOG_STORAGE_PATH=/tmp/blbackup.log \
+            -e LOG_HOSTNAME=ci \
+            blbackup:ci php blbackup app:validate --no-api
+
+      - name: Regressions this image has had
+        run: |
+          # rclone is installed by hand to /usr/local/bin, but RCLONE_BINARY
+          # defaults to /usr/bin/rclone - both have to work
+          docker run --rm blbackup:ci /usr/bin/rclone --version
+
+          # .dockerignore excludes /storage on purpose; the empty directory
+          # still has to exist, because every rclone call runs from there and
+          # Symfony's Process will not start when its cwd does not
+          docker run --rm blbackup:ci test -d /app/storage
+
+          # a mistyped command must exit non-zero: this tool's exit code is the
+          # whole of what cron reads
+          if docker run --rm blbackup:ci php blbackup app:validte; then
+            echo 'A mistyped command exited 0'
+            exit 1
+          fi
+
+  build:
+    name: compiled binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # app:build takes its version from `git describe`, so the tags have
+          # to be here or the artefact announces itself as "unreleased"
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl
+          coverage: none
+          # box writes a phar, which php refuses to do by default
+          ini-values: phar.readonly=0
+
+      - uses: ramsey/composer-install@v3
+
+      - name: Compile
+        # composer build installs --no-dev, compiles, restores, and then fails
+        # if laravel/pint is still findable in the artefact. app:build never
+        # runs composer and box.json takes vendor/ wholesale, so building from
+        # a dev checkout compiles pint, phpunit, pest and mockery into the
+        # binary - 29 MB of a 29 MB artefact, and nothing noticed for a while
+        run: composer build
+
+      - name: It runs, and knows what it is
+        run: |
+          ./builds/blbackup --version
+          ./builds/blbackup list > /dev/null

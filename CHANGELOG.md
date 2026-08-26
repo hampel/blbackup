@@ -8,6 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **CI**, which this repository had none of. Three jobs on every push: the test
+  suite, a build of the container image with `app:validate --no-api` run inside
+  it, and a compiled binary through `composer build`. The container job is the
+  reason the file exists — the `Dockerfile` had never been built anywhere but
+  the production server, so its first execution was always on the machine that
+  takes the backups, and two defects reached it that way. It also asserts the
+  two specific regressions: `/usr/bin/rclone` runs, and `/app/storage` exists.
+
 ### Fixed
 
 - **`.env.example` showed an example as though it were the default**, in three
