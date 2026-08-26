@@ -30,6 +30,7 @@ php blbackup download <host|id>|--all|--image=ID [-f|--force] [--no-test] [--no-
 php blbackup check <file>|--all [--dry-run]
 php blbackup move  <file>|--all [--remote=REMOTE] [--dry-run]
 php blbackup clean [--days=N] [--remote] [--dry-run]
+php blbackup cron  [--include=FILE] [--exclude=FILE] [--no-move] [--no-clean]
 
 php blbackup test                # Laravel Zero's Pest runner (same as vendor/bin/pest)
 php vendor/bin/pest tests/Feature/SomeTest.php     # single file
@@ -126,6 +127,28 @@ nothing. It has to be rebound in `bootstrap/app.php` over the binding
 because `$this->artisan()` calls the command and never passes through the
 proxying — and it marks the input non-interactive, since Symfony's "Did you mean
 this?" prompt otherwise waits on stdin and hangs the suite.
+
+**One lock covers every command that writes**, so a run that overruns holds the
+next one off rather than running over the top of it — a multi-gigabyte image on
+a slow link is exactly the case that overruns. `App\Support\BackupLock` is a
+container singleton holding an `flock`, taken in `BaseCommand::execute()` by any
+command with `$locks = true` (`cron`, `create`, `download`, `move`, `clean` —
+the listing commands and `check` only read). The kernel releases an `flock` when
+the process ends however it ends, so a killed run leaves no stale lock to break
+by hand.
+
+It has to be a singleton: `flock` is associated with the open file description
+rather than the process, so `cron` opening the file and then `create` opening it
+again would deadlock the run against itself. Nested stages see `isHeld()` and
+leave it alone, both to take and to release. A dry run skips the lock entirely —
+asking what `clean --dry-run` would delete while a backup runs is the point of
+the flag.
+
+**In a container `LOCK_FILE` must name a path on a shared mount.** Each
+`docker compose run` gets its own filesystem, so the default under the storage
+path is a lock two concurrent runs cannot see each other holding — it does
+nothing, and nothing says so. `app:validate` takes the lock and prints the path
+it used for exactly that reason.
 
 **The run summary is a notification, not a log record.** `App\Support\RunSummary`
 is a container singleton — for the same reason the stages need one, since

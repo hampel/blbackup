@@ -49,6 +49,8 @@ class Cron extends BaseCommand
      */
     protected bool $summarises = true;
 
+    protected bool $locks = true;
+
     /**
      * Execute the console command.
      *

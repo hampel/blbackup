@@ -39,6 +39,8 @@ class Download extends BaseCommand
 
     protected string $commandContext = 'download';
 
+    protected bool $locks = true;
+
     /**
      * Execute the console command.
      */

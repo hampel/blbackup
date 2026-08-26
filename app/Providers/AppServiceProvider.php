@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\BackupLock;
 use App\Support\RunSummary;
 use App\Support\SlackSummary;
 use GuzzleHttp\Client;
@@ -37,6 +38,11 @@ class AppServiceProvider extends ServiceProvider
         // shared for the same reason wback shares its: the stages of a run are
         // separate command objects - create calls download, download calls move -
         // and the run is what is being summarised rather than any one of them
+        // a singleton because cron takes the lock for a whole run and the stages
+        // it calls have to see it is already held - flock conflicts with itself
+        // when one process opens the same file twice
+        $this->app->singleton(BackupLock::class);
+
         $this->app->singleton(RunSummary::class);
 
         // bound rather than constructed where it is used, so a test can hand the

@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -35,6 +36,7 @@ uses(Tests\TestCase::class)
             'binarylane.wget_binary' => '/usr/bin/wget',
             'binarylane.rclone.binary' => '/usr/bin/rclone',
             'binarylane.rclone.remote' => 'remote:backups',
+            'binarylane.lock_file' => storage_path('framework/testing/blbackup.lock'),
 
             // the project .env is loaded in tests too, and without this the
             // suite appends to whatever log the developer has configured
@@ -223,6 +225,29 @@ function wgetWrites(int $bytes): Closure
  * Write a server list of the kind create's --include / --exclude take, and
  * return the absolute path to it.
  */
+/**
+ * Hold the backup lock, as another run would.
+ *
+ * flock is associated with the open file description rather than the process,
+ * so a second fopen() of the same path conflicts even from inside the suite.
+ * The caller has to keep the handle: closing it releases the lock.
+ */
+function holdLock(string $holder = 'pid 999, cron, started 2026-08-26 02:00:00'): mixed
+{
+    $path = config('binarylane.lock_file');
+
+    File::ensureDirectoryExists(dirname($path));
+
+    $handle = fopen($path, 'c');
+
+    flock($handle, LOCK_EX | LOCK_NB);
+    ftruncate($handle, 0);
+    fwrite($handle, $holder);
+    fflush($handle);
+
+    return $handle;
+}
+
 function writeServerList(string $name, array $servers): string
 {
     Storage::disk('downloads')->put($name, implode(PHP_EOL, $servers));

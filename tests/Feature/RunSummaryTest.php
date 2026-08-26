@@ -338,3 +338,23 @@ it('keeps what a run did when it fails part way through', function () {
     expect($summary->hasWork())->toBeTrue()
         ->and($summary->blockedBy())->toBeNull();
 });
+
+it('reports a run skipped for the lock as one that did not happen', function () {
+    $history = [];
+    interceptSummary($history);
+
+    $handle = holdLock();
+
+    fakeApi([fakeServer()]);
+    fakeBinaries();
+
+    $this->artisan('cron', ['--no-clean' => true])->assertFailed();
+
+    // a backup that did not happen is the failure worth hearing about most, and
+    // the one that otherwise leaves nothing behind but a single log line
+    expect(sentPayload($history)['text'])->toBe('Backup did not run on unraid')
+        ->and(sentPayload($history)['attachments'][0]['text'])->toContain('Another backup is still running')
+        ->and(sentPayload($history)['attachments'][0]['fields'] ?? [])->toBe([]);
+
+    fclose($handle);
+});

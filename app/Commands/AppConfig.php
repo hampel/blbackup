@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Support\BackupLock;
 use Hampel\ConsoleReport\FormatsValues;
 use Hampel\ConsoleReport\ReportsSettings;
 use LaravelZero\Framework\Commands\Command;
@@ -60,6 +61,7 @@ class AppConfig extends Command
                 'API Token' => $this->secretStatus(config('binarylane.api_token')),
                 'API Timeout' => (string) config('binarylane.timeout'),
                 'Keep Only Days' => (string) config('binarylane.keeponly_days'),
+                'Lock File' => $this->path(app(BackupLock::class)->path()),
                 'zstd Binary' => $this->path(config('binarylane.zstd_binary')),
                 'wget Binary' => $this->path(config('binarylane.wget_binary')),
                 'rclone Binary' => $this->path(config('binarylane.rclone.binary')),

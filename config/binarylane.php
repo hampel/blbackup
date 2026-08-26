@@ -42,6 +42,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Lock file
+    |--------------------------------------------------------------------------
+    |
+    | One lock covers every command that writes, so a run that overruns holds
+    | the next one off rather than running over the top of it. Defaults to the
+    | storage path.
+    |
+    | In a container this MUST name a path on a shared mount. Each
+    | `docker compose run` gets its own filesystem, so a lock inside the image
+    | is a lock two concurrent runs cannot see each other holding.
+    */
+
+    'lock_file' => env('LOCK_FILE', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | rclone settings
     |--------------------------------------------------------------------------
     |

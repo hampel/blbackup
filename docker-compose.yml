@@ -5,7 +5,10 @@
 #             docker compose run --rm blbackup php blbackup cron >> /mnt/user/logs/blbackup/cron.log 2>&1
 #
 # `cron` is the whole run - back up, download, move, expire - and the only
-# command that posts a Slack run summary. Whether the downloads are moved to
+# command that posts a Slack run summary. Set LOCK_FILE in .env to a path under
+# one of the mounts below, eg /logs/blbackup.lock: each `docker compose run`
+# gets its own filesystem, so a lock left at its default inside the container is
+# one two concurrent runs cannot see each other holding. Whether the downloads are moved to
 # secondary storage is decided by RCLONE_REMOTE: set, and they are moved there
 # and expired there; unset, and they stay on this machine. Nothing else changes.
 #

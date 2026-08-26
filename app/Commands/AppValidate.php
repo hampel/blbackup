@@ -3,9 +3,11 @@
 namespace App\Commands;
 
 use App\Exceptions\BinaryLaneException;
+use App\Support\BackupLock;
 use App\Support\SlackSummary;
 use Hampel\ConsoleReport\RendersChecks;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -56,6 +58,7 @@ class AppValidate extends BaseCommand
 
         $this->section("Storage");
         $this->checkDownloadPath();
+        $this->checkLock();
         $this->checkLogging();
 
         $this->section("External commands");
@@ -329,6 +332,42 @@ class AppValidate extends BaseCommand
         $this->reportOk($label, "{$binary} ({$version})");
     }
 
+    /**
+     * Take the lock and give it straight back.
+     *
+     * Exercising it rather than reporting that the path looks writable, for the
+     * same reason as everything else here - and it is the one check that can
+     * legitimately come back held, which is what a run overrunning into this one
+     * looks like.
+     */
+    protected function checkLock() : void
+    {
+        $lock = $this->app->make(BackupLock::class);
+
+        try
+        {
+            if (!$lock->acquire($this->getName()))
+            {
+                $this->reportWarn("lock file", "held by another run [" . $lock->holder() . "]");
+
+                return;
+            }
+        }
+        catch (\RuntimeException $e)
+        {
+            $this->reportFail("lock file", $e->getMessage());
+
+            return;
+        }
+
+        $lock->release();
+
+        // the path matters as much as the outcome: in a container each run has
+        // its own filesystem, so a lock that is not on a shared mount is one two
+        // concurrent runs cannot see each other holding
+        $this->reportOk("lock file", $lock->path());
+    }
+
     protected function checkRemote() : void
     {
         $remote = config('binarylane.rclone.remote');
@@ -341,7 +380,19 @@ class AppValidate extends BaseCommand
             return;
         }
 
-        $result = Process::run(config('binarylane.rclone.binary') . " lsd --quiet {$remote}");
+        // the one probe here that crosses a network, and the only one that can
+        // take longer than the process timeout - which threw a stack trace out
+        // of the command whose whole job is to report a failure legibly
+        try
+        {
+            $result = Process::run(config('binarylane.rclone.binary') . " lsd --quiet {$remote}");
+        }
+        catch (ProcessTimedOutException $e)
+        {
+            $this->reportFail("rclone remote", "{$remote} did not answer within the process timeout");
+
+            return;
+        }
 
         if ($result->failed())
         {

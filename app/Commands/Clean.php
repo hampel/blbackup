@@ -29,6 +29,8 @@ class Clean extends BaseCommand
 
     protected string $commandContext = 'clean';
 
+    protected bool $locks = true;
+
     /**
      * Execute the console command.
      */

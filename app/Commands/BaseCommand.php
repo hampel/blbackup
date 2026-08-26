@@ -2,6 +2,8 @@
 
 use App\Api;
 use App\Exceptions\BinaryLaneException;
+use App\Support\BackupLock;
+use App\Support\LocksBackups;
 use App\Support\RunSummary;
 use App\Support\SlackSummary;
 use Illuminate\Http\Client\ConnectionException;
@@ -13,6 +15,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command
 {
+    use LocksBackups;
+
     protected string $commandContext;
 
     protected Api $api;
@@ -35,6 +39,14 @@ abstract class BaseCommand extends Command
      */
     protected bool $ownsRun = false;
 
+    /**
+     * Whether this command takes the backup lock.
+     *
+     * The ones that write do; the ones that only read do not, because being
+     * unable to list servers while a backup runs would be an odd sort of safety.
+     */
+    protected bool $locks = false;
+
     protected function execute(InputInterface $input, OutputInterface $output) : int
     {
         if (isset($this->commandContext)) {
@@ -54,16 +66,36 @@ abstract class BaseCommand extends Command
 
         try
         {
-            $status = parent::execute($input, $output);
-        }
-        catch (BinaryLaneException | ConnectionException $e)
-        {
-            Log::error($e->getMessage());
-            $this->components->error($e->getMessage());
+            // one lock for the whole run, so tonight's backups cannot start over
+            // the top of last night's - a multi-gigabyte image that overruns is
+            // what a slow link does, not an exotic case. The stages cron calls
+            // see it is already held and leave it alone.
+            if (!$this->acquireLock())
+            {
+                $this->recordFailedStart((string) $this->lockFailure);
 
-            $this->summary->recordFailure($this->getName(), $this->getName(), $e->getMessage());
+                return static::FAILURE;
+            }
 
-            $status = static::FAILURE;
+            try
+            {
+                $status = parent::execute($input, $output);
+            }
+            catch (BinaryLaneException | ConnectionException $e)
+            {
+                Log::error($e->getMessage());
+                $this->components->error($e->getMessage());
+
+                $this->summary->recordFailure($this->getName(), $this->getName(), $e->getMessage());
+
+                $status = static::FAILURE;
+            }
+            finally
+            {
+                // the kernel would do this when the process ended, but a command
+                // called by another has to give it back before the caller goes on
+                $this->releaseLock();
+            }
         }
         finally
         {

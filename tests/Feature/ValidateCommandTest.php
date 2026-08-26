@@ -107,6 +107,27 @@ it('fails when the remote does not answer', function () {
         ->toContain('did not answer');
 });
 
+it('fails rather than crashing when the remote does not answer in time', function () {
+    fakeApi([fakeServer()]);
+    fakeBinaries([
+        '*lsd*' => fn () => throw new Illuminate\Process\Exceptions\ProcessTimedOutException(
+            new Symfony\Component\Process\Exception\ProcessTimedOutException(
+                new Symfony\Component\Process\Process(['rclone']), 1
+            ),
+            Process::result()
+        ),
+        '*--version*' => Process::result(output: 'some tool v1.2.3'),
+    ]);
+
+    // a stack trace out of the command whose whole job is to report failures
+    // legibly is the one outcome it must never produce
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] rclone remote')
+        ->toContain('did not answer within the process timeout');
+});
+
 it('skips the remote when none is configured, without failing', function () {
     fakeApi([fakeServer()]);
     config(['binarylane.rclone.remote' => null]);
