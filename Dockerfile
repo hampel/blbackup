@@ -36,7 +36,16 @@ ARG RCLONE_VERSION=v1.69.2
 RUN curl -fsSLO "https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip" \
  && unzip -q "rclone-${RCLONE_VERSION}-linux-amd64.zip" \
  && install -m 0755 "rclone-${RCLONE_VERSION}-linux-amd64/rclone" /usr/local/bin/rclone \
+ && ln -s /usr/local/bin/rclone /usr/bin/rclone \
  && rm -rf "rclone-${RCLONE_VERSION}-linux-amd64" "rclone-${RCLONE_VERSION}-linux-amd64.zip"
+
+# The symlink above is not decoration. /usr/local/bin is the right place for a
+# binary installed by hand and is where rclone's own installer puts it - but
+# RCLONE_BINARY defaults to /usr/bin/rclone, which is where apt would have put
+# it and what .env.example documents. wget and zstd come from apt and land there
+# already; rclone was the one that did not, so an install following the
+# documented defaults had `move` and `clean --remote` fail on a path that does
+# not exist. Both paths now work, whatever an existing .env says.
 
 # Backup images are large and are streamed to disk rather than held in memory,
 # but the API responses and progress handling still want headroom.

@@ -8,6 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The container installed rclone to `/usr/local/bin/rclone` while
+  `RCLONE_BINARY` defaults to `/usr/bin/rclone`, so a container install
+  following the documented defaults had `move` and `clean --remote` fail on a
+  path that does not exist. `wget` and `zstd` come from apt and land in
+  `/usr/bin` already; rclone was the one installed by hand. The image now
+  symlinks `/usr/bin/rclone` to it, so both paths work whatever an existing
+  `.env` says. `app:validate` reports which one it found.
+
 ## [2.0.0] - 2026-08-26
 
 The release that makes an unattended run trustworthy. Before it, a night that
