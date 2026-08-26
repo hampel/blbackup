@@ -1,3 +1,14 @@
+# Actions are pinned to full-length commit SHAs because this repository requires
+# it - a version tag is a moving target that the action's owner can repoint at
+# any commit, and a workflow with repository write access is a bad place for
+# that. The comment beside each SHA is the release it was taken from; to update
+# one, resolve the tag again rather than replacing the SHA with the tag.
+#
+#   git ls-remote --tags https://github.com/actions/checkout | grep 'v7.0.1$'
+#
+# An annotated tag needs the dereferenced line - refs/tags/x^{} - which is the
+# commit; the bare line is the tag object and will not be accepted.
+
 name: ci
 
 on:
@@ -27,15 +38,15 @@ jobs:
         php: ['8.3']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: ${{ matrix.php }}
           extensions: intl
           coverage: none
 
-      - uses: ramsey/composer-install@v3
+      - run: composer install --no-interaction --prefer-dist --no-progress
 
       - run: php vendor/bin/pest
 
@@ -49,7 +60,7 @@ jobs:
     # that way: rclone installed somewhere the configured path did not point,
     # and a missing /app/storage that made every rclone call refuse to start.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build the image
         run: docker build -t blbackup:ci .
@@ -90,13 +101,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # app:build takes its version from `git describe`, so the tags have
           # to be here or the artefact announces itself as "unreleased"
           fetch-depth: 0
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.3'
           extensions: intl
@@ -104,7 +115,7 @@ jobs:
           # box writes a phar, which php refuses to do by default
           ini-values: phar.readonly=0
 
-      - uses: ramsey/composer-install@v3
+      - run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Compile
         # composer build installs --no-dev, compiles, restores, and then fails
