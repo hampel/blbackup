@@ -79,9 +79,12 @@ than `php blbackup app:build` directly: `app:build` never runs Composer and
 `box.json` takes `vendor/` wholesale, so building from a development checkout
 compiles Pint, PHPUnit, Pest and Mockery into the binary.
 
-The binary resolves `.env`, its logs and the default download path **relative to
-the working directory**, so keep `.env` beside it — or set an absolute
-`LARAVEL_STORAGE_PATH`.
+The binary reads **`.env` from the directory holding the binary**, and resolves
+its logs and the default download path **against the working directory**. Under
+cron those are rarely the same place — the working directory is wherever the
+crontab last changed to — so keep `.env` beside the binary and set an absolute
+`LARAVEL_STORAGE_PATH`. `blbackup app:config` reports what each path resolved
+to.
 
 ### From source
 

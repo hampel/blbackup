@@ -273,8 +273,19 @@ at build time and no `.env` beside the binary can change it. That is why the
 timezone lives as `binarylane.timezone` and is applied with
 `date_default_timezone_set()` in `AppServiceProvider::boot()` rather than as
 `app.timezone`. `bootstrap/app.php` likewise repoints the storage path at
-`getcwd()` when running inside a Phar, so a compiled binary resolves `.env`, logs
-and the default download path relative to the working directory.
+`getcwd()` when running inside a Phar, so a compiled binary resolves logs and the
+default download path relative to the working directory.
+
+**But not `.env`, and the difference is measured rather than assumed.** A
+compiled binary reads `.env` from the directory holding the binary — its base
+path is inside the Phar, and Laravel Zero points it at the Phar's own directory
+— while `useStoragePath(getcwd())` sends everything else to the working
+directory. Verified by running one binary from two directories: the `.env` beside
+it won over the one in `cwd`, and the storage path followed `cwd` regardless.
+Under cron that splits: the binary reads its settings from where it lives and
+writes its logs to wherever the crontab last changed to, which is why
+`LARAVEL_STORAGE_PATH` exists and why `app:config` reports what each path
+resolved against.
 
 **Logging still resolves to nothing until `LOG_STACK` is set.** `logging.default`
 is `stack`, but the stack's own channel list defaults to `null`, which discards
