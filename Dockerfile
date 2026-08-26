@@ -47,6 +47,15 @@ RUN curl -fsSLO "https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_
 # documented defaults had `move` and `clean --remote` fail on a path that does
 # not exist. Both paths now work, whatever an existing .env says.
 
+# .dockerignore excludes /storage - it holds a working checkout's downloads,
+# logs and compiled phar, none of which belong in an image. But the directory
+# itself has to exist: rclone is run with storage_path() as its working
+# directory, and Symfony's Process refuses to start at all when its cwd does
+# not, so `move`, `clean --remote` and download's already-on-the-remote check
+# died with "The provided cwd /app/storage does not exist" - after the backup
+# had been taken, which is the worst point in the run to fall over.
+RUN mkdir -p /app/storage
+
 # Backup images are large and are streamed to disk rather than held in memory,
 # but the API responses and progress handling still want headroom.
 RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory.ini

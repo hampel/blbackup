@@ -10,6 +10,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The container had no `/app/storage`, and every rclone call runs from
+  there.** `.dockerignore` excludes `/storage` deliberately - it holds a working
+  checkout's downloads, logs and compiled phar - but nothing then created the
+  empty directory, and Symfony's `Process` refuses to start when its working
+  directory does not exist. So `move`, `clean --remote` and `download`'s
+  already-on-the-remote check all threw `The provided cwd "/app/storage" does
+  not exist`, *after* the backup had been taken and downloaded. The image now
+  creates it.
+- **`app:validate` passed on an installation that could not move a file**,
+  which is the more serious half: it checked the download path and the log path
+  but never the storage path. It now checks that too, and fails rather than
+  warns, because a missing cwd is not a degraded run.
 - The container installed rclone to `/usr/local/bin/rclone` while
   `RCLONE_BINARY` defaults to `/usr/bin/rclone`, so a container install
   following the documented defaults had `move` and `clean --remote` fail on a

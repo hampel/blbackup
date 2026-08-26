@@ -57,6 +57,7 @@ class AppValidate extends BaseCommand
         $this->checkTimezone();
 
         $this->section("Storage");
+        $this->checkStoragePath();
         $this->checkDownloadPath();
         $this->checkLock();
         $this->checkLogging();
@@ -124,6 +125,36 @@ class AppValidate extends BaseCommand
         {
             $this->reportFail("Timezone", "[{$timezone}] is not a known timezone");
         }
+    }
+
+    /**
+     * The working directory every rclone call is given.
+     *
+     * Checked because Symfony's Process refuses to start when its cwd does not
+     * exist, so a missing storage directory is not a degraded run - it is
+     * `move` and `clean --remote` throwing after the backup has been taken.
+     * A container is where this happens: /storage is excluded from the image on
+     * purpose, and nothing then creates the directory it left out.
+     */
+    protected function checkStoragePath() : void
+    {
+        $path = storage_path();
+
+        if (!is_dir($path))
+        {
+            $this->reportFail("Storage path", "{$path} does not exist - rclone is run from there");
+
+            return;
+        }
+
+        if (!is_writable($path))
+        {
+            $this->reportWarn("Storage path", "{$path} is not writable");
+
+            return;
+        }
+
+        $this->reportOk("Storage path", $path);
     }
 
     protected function checkDownloadPath() : void

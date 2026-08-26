@@ -163,6 +163,23 @@ it('warns when the stack contains only the null channel', function () {
     expect($exit)->toBe(0)->and($output)->toContain('[warn] log channel')->toContain('LOG_STACK');
 });
 
+it('fails when the storage path does not exist, because rclone runs from there', function () {
+    fakeApi([fakeServer()]);
+
+    // Symfony's Process refuses to start when its cwd does not exist, so this
+    // is move and clean --remote throwing after the backup has been taken -
+    // not a degraded run. A container is where it happens: /storage is left
+    // out of the image on purpose and nothing recreates the empty directory.
+    config(['app.storage_path' => '/no/such/directory']);
+    app()->useStoragePath('/no/such/directory');
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] Storage path')
+        ->toContain('does not exist');
+});
+
 it('checks the log file is writable', function () {
     fakeApi([fakeServer()]);
     config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('blbackup-test.log')]);
