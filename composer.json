@@ -1,18 +1,18 @@
 {
-    "name": "laravel-zero/laravel-zero",
-    "description": "The Laravel Zero Framework.",
-    "keywords": ["framework", "laravel", "laravel zero", "console", "cli"],
-    "homepage": "https://laravel-zero.com",
+    "name": "hampel/blbackup",
+    "description": "BinaryLane VPS backup: temporary snapshots taken through the API, downloaded as compressed disk images, verified, shipped to cloud storage and expired.",
+    "keywords": ["backup", "binarylane", "vps", "rclone", "zstd", "console", "cli"],
+    "homepage": "https://github.com/hampel/blbackup",
     "type": "project",
     "license": "MIT",
     "support": {
-        "issues": "https://github.com/laravel-zero/laravel-zero/issues",
-        "source": "https://github.com/laravel-zero/laravel-zero"
+        "issues": "https://github.com/hampel/blbackup/issues",
+        "source": "https://github.com/hampel/blbackup"
     },
     "authors": [
         {
-            "name": "Nuno Maduro",
-            "email": "enunomaduro@gmail.com"
+            "name": "Simon Hampel",
+            "email": "simon@hampelgroup.com"
         }
     ],
     "require": {
@@ -48,6 +48,15 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
+    },
+    "scripts": {
+        "test": "pest",
+        "build": [
+            "@composer install --no-dev --no-interaction",
+            "@php blbackup app:build blbackup",
+            "@composer install --no-interaction",
+            "if grep -aq 'laravel/pint' builds/blbackup; then echo 'ERROR: the build contains dev dependencies - do not release it'; exit 1; fi"
+        ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
