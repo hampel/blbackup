@@ -61,6 +61,8 @@ class AppConfig extends Command
                 'API Token' => $this->secretStatus(config('binarylane.api_token')),
                 'API Timeout' => (string) config('binarylane.timeout'),
                 'Keep Only Days' => (string) config('binarylane.keeponly_days'),
+                'Include File' => $this->optionalPath(config('binarylane.include_file')),
+                'Exclude File' => $this->optionalPath(config('binarylane.exclude_file')),
                 'Lock File' => $this->path(app(BackupLock::class)->path()),
                 'zstd Binary' => $this->path(config('binarylane.zstd_binary')),
                 'wget Binary' => $this->path(config('binarylane.wget_binary')),
@@ -95,5 +97,17 @@ class AppConfig extends Command
         ], $this->option('only'));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * A path that is empty in the ordinary case, so an empty one is not a fault.
+     *
+     * path() reports an unset value as "not set" in warning yellow, which is
+     * right for a setting the tool needs and wrong for the server lists - most
+     * installations back up everything and set neither.
+     */
+    protected function optionalPath(?string $value) : string
+    {
+        return $value === null || $value === '' ? $this->optional($value) : $this->path($value);
     }
 }

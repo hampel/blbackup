@@ -38,6 +38,12 @@ uses(Tests\TestCase::class)
             'binarylane.rclone.remote' => 'remote:backups',
             'binarylane.lock_file' => storage_path('framework/testing/blbackup.lock'),
 
+            // no server list unless a test asks for one - the project .env is
+            // loaded here too, and a developer who has configured one would
+            // otherwise find every test filtering its server list
+            'binarylane.include_file' => null,
+            'binarylane.exclude_file' => null,
+
             // the project .env is loaded in tests too, and without this the
             // suite appends to whatever log the developer has configured
             'logging.default' => 'null',

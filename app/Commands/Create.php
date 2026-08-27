@@ -4,7 +4,6 @@ namespace App\Commands;
 
 use Carbon\CarbonInterval;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
 use Illuminate\Support\Sleep;
@@ -86,30 +85,8 @@ class Create extends BaseCommand
             $this->log('notice', "Backing up all servers");
         }
 
-        $includeServers = null;
-        $excludeServers = null;
-
-        $include = $this->option('include');
-        if (!empty($include))
-        {
-            if (!File::exists($include))
-            {
-                $this->fail("Include file [{$include}] does not exists or is not readable");
-            }
-
-            $includeServers = array_filter(explode(PHP_EOL, File::get($include)));
-        }
-
-        $exclude = $this->option('exclude');
-        if (!empty($exclude))
-        {
-            if (!File::exists($exclude))
-            {
-                $this->fail("Exclude file [{$exclude}] does not exists or is not readable");
-            }
-
-            $excludeServers = array_filter(explode(PHP_EOL, File::get($exclude)));
-        }
+        $includeServers = $this->serverList('include');
+        $excludeServers = $this->serverList('exclude');
 
         $failed = collect($servers)
             ->filter(function ($server) use ($includeServers) {

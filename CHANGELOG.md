@@ -18,8 +18,30 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   takes the backups, and two defects reached it that way. It also asserts the
   two specific regressions: `/usr/bin/rclone` runs, and `/app/storage` exists.
 
+### Added
+
+- **`INCLUDE_FILE` and `EXCLUDE_FILE`**, so the server lists can be configured
+  rather than existing only as `--include` / `--exclude` on the command line. The
+  options still win for one run. This closes a gap found in production: the
+  exclude list is the setting that decides *what gets backed up*, and living on
+  the crontab line made it the one setting `app:config` could not show and
+  `app:validate` could not check — nothing could tell you the path was wrong
+  until a run failed on it.
+- **`app:validate` checks the configured lists** — it reports the path and how
+  many servers each names, fails on one that cannot be read, and warns on one
+  that names nothing. Unset is a skip rather than a fault: most installations
+  back up everything.
+
 ### Changed
 
+- **The `--include` / `--exclude` block moved to `BaseCommand::serverList()`**,
+  which `create` and `download` had carried identical copies of. Lines are now
+  trimmed on the way in — a list edited on Windows arrives with CRLF endings and
+  matched no hostname at all, so it filtered nobody without a word. A file that
+  names no servers is now explicitly treated as no list rather than as an empty
+  one, which is the behaviour it already had by accident and is the safe way
+  round: a truncated include list must not silently stop the backups. That is
+  surprising enough that `app:validate` warns about it.
 - **`app:validate`'s section headings now come from `hampel/console-report` 2.1**
   (`RendersChecks::checkSection()`) rather than from `BaseCommand::section()`.
   They move to the two-column margin, so a heading lines up with the `[ ok ]`

@@ -62,6 +62,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Server lists
+    |--------------------------------------------------------------------------
+    |
+    | Paths to plain-text files naming servers to back up, one hostname per
+    | line, matched against the server's name. An include list backs up only
+    | the servers it names; an exclude list backs up everything but those.
+    |
+    | Neither is set by default, which means no filtering - every server on the
+    | account is backed up. That is not an error and app:validate does not treat
+    | it as one.
+    |
+    | These exist so that an unattended install can be read out of its
+    | configuration. --include and --exclude override them for one run, but a
+    | list that only ever appeared on a crontab line is invisible to app:config
+    | and unverifiable by app:validate: nothing can tell you the path is wrong
+    | until a run fails on it, and nothing can tell you the run is quietly
+    | backing up more than you think.
+    |
+    */
+
+    'include_file' => env('INCLUDE_FILE'),
+
+    'exclude_file' => env('EXCLUDE_FILE'),
+
+    /*
+    |--------------------------------------------------------------------------
     | rclone settings
     |--------------------------------------------------------------------------
     |

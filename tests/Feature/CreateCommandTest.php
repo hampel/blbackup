@@ -3,6 +3,7 @@
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 /*
 | The create command polls BinaryLane with Sleep::for(10)->seconds()->while(),
@@ -109,6 +110,81 @@ it('skips the servers named in an exclude file', function () {
 
     Http::assertSent(backupWasRequestedFor(100));
     Http::assertNotSent(backupWasRequestedFor(200));
+});
+
+it('takes the exclude list from configuration when no option is given', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
+
+    $this->artisan('create', ['--all' => true])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(100));
+    Http::assertNotSent(backupWasRequestedFor(200));
+});
+
+it('takes the include list from configuration when no option is given', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['binarylane.include_file' => writeServerList('include.txt', ['db1.example.com'])]);
+
+    $this->artisan('create', ['--all' => true])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(200));
+    Http::assertNotSent(backupWasRequestedFor(100));
+});
+
+it('lets the option override the configured list', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['binarylane.exclude_file' => writeServerList('configured.txt', ['db1.example.com'])]);
+
+    $this->artisan('create', [
+        '--all' => true,
+        '--exclude' => writeServerList('given.txt', ['web1.example.com']),
+    ])->assertSuccessful();
+
+    // the configured list would have excluded 200, the given one excludes 100
+    Http::assertSent(backupWasRequestedFor(200));
+    Http::assertNotSent(backupWasRequestedFor(100));
+});
+
+it('trims the lines of a server list, so a file written on windows still matches', function () {
+    fakeApi([$this->server, $this->other]);
+
+    Storage::disk('downloads')->put('crlf.txt', "db1.example.com\r\n");
+
+    config(['binarylane.exclude_file' => downloadPath('crlf.txt')]);
+
+    $this->artisan('create', ['--all' => true])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(100));
+    Http::assertNotSent(backupWasRequestedFor(200));
+});
+
+it('backs up everything when the configured list names no servers', function () {
+    fakeApi([$this->server, $this->other]);
+
+    // the safe way round: a truncated list must not silently stop the backups.
+    // app:validate is what warns that it has stopped filtering
+    config(['binarylane.include_file' => writeServerList('empty.txt', [])]);
+
+    $this->artisan('create', ['--all' => true])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(100));
+    Http::assertSent(backupWasRequestedFor(200));
+});
+
+it('fails when the configured exclude file cannot be read', function () {
+    fakeApi([$this->server]);
+
+    config(['binarylane.exclude_file' => '/no/such/list.txt']);
+
+    $this->artisan('create', ['--all' => true])
+        ->expectsOutputToContain('Exclude file [/no/such/list.txt] does not exists or is not readable')
+        ->assertFailed();
+
+    Http::assertNotSent(backupWasRequestedFor(100));
 });
 
 it('fails when the include file cannot be read', function () {

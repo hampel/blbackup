@@ -282,6 +282,19 @@ it('skips the servers named in an exclude file', function () {
     Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'db1.example.com'));
 });
 
+it('takes the exclude list from configuration when no option is given', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    config(['binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
+
+    $this->artisan('download', ['--all' => true])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'db1.example.com'));
+});
+
 it('fails when the include file cannot be read', function () {
     fakeOneBackup($this->server, $this->image, $this->url);
     fakeBinaries();

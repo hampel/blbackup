@@ -7,6 +7,7 @@ use App\Support\LocksBackups;
 use App\Support\RunSummary;
 use App\Support\SlackSummary;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
@@ -191,6 +192,50 @@ abstract class BaseCommand extends Command
         $this->summary->hasWork()
             ? $this->summary->recordFailure($this->getName(), $this->getName(), $message)
             : $this->summary->block($message);
+    }
+
+    /**
+     * The server list named by --include or --exclude, or by configuration.
+     *
+     * The option wins for one run; configuration is what an unattended install
+     * is read out of.
+     *
+     * A file that yields no entries is treated as no list at all, so an empty
+     * include file backs up every server rather than none. That is the safe way
+     * round - a truncated list should not silently stop the backups - but it is
+     * surprising enough that app:validate warns about it, since nothing else
+     * would say a word.
+     *
+     * A missing file fails the command rather than being ignored. A list that
+     * silently did not apply is the failure worth being loud about: the run
+     * looks like every other night and quietly backs up more than was asked.
+     *
+     * Lines are trimmed before they are matched. These files get edited on
+     * Windows through \\wsl$, and a CRLF list matches nothing at all against
+     * hostnames that have no carriage return in them - which excludes nobody,
+     * without a word.
+     *
+     * @param string $which 'include' or 'exclude'
+     *
+     * @return array<int, string>|null the hostnames, or null when no list applies
+     */
+    protected function serverList(string $which) : ?array
+    {
+        $path = $this->option($which) ?: config("binarylane.{$which}_file");
+
+        if (empty($path))
+        {
+            return null;
+        }
+
+        if (!File::exists($path))
+        {
+            $this->fail(ucfirst($which) . " file [{$path}] does not exists or is not readable");
+        }
+
+        $names = array_values(array_filter(array_map('trim', explode(PHP_EOL, File::get($path)))));
+
+        return $names === [] ? null : $names;
     }
 
     protected function log($level, $message, $logMessage = null, $context = [])

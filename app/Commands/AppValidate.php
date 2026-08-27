@@ -8,6 +8,7 @@ use App\Support\SlackSummary;
 use Hampel\ConsoleReport\RendersChecks;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -61,6 +62,10 @@ class AppValidate extends BaseCommand
         $this->checkDownloadPath();
         $this->checkLock();
         $this->checkLogging();
+
+        $this->checkSection("Server lists");
+        $this->checkServerList('include');
+        $this->checkServerList('exclude');
 
         $this->checkSection("External commands");
         $this->checkBinary('zstd', config('binarylane.zstd_binary'), '--version');
@@ -570,6 +575,59 @@ class AppValidate extends BaseCommand
             $this->formatBytes($bytes),
             Number::format($seconds, 1),
             Number::format(($bytes / (1024 * 1024)) / $seconds, 1)
+        ));
+    }
+
+    /**
+     * An --include / --exclude list named in the configuration.
+     *
+     * The list decides what gets backed up, so getting it wrong is the failure
+     * that looks most like success: the run completes, the summary posts, and
+     * the servers you thought were covered are not. Nothing else on this machine
+     * can tell you the path is wrong until a run fails on it, and nothing at all
+     * can tell you an empty list quietly stopped filtering.
+     *
+     * A list given only on the command line cannot be checked from here - that
+     * is the argument for configuring it rather than putting it on the crontab
+     * line, and the skip says so.
+     */
+    protected function checkServerList(string $which) : void
+    {
+        $label = "{$which} list";
+        $path = config("binarylane.{$which}_file");
+
+        if (empty($path))
+        {
+            $this->reportSkip($label, sprintf(
+                'not set - %s (--%s overrides for one run)',
+                $which === 'include' ? 'every server is backed up' : 'no servers are excluded',
+                $which
+            ));
+
+            return;
+        }
+
+        if (!File::exists($path))
+        {
+            $this->reportFail($label, "{$path} - does not exist or is not readable");
+
+            return;
+        }
+
+        $names = array_values(array_filter(array_map('trim', explode(PHP_EOL, File::get($path)))));
+
+        if ($names === [])
+        {
+            $this->reportWarn($label, "{$path} - names no servers, so it does not filter anything");
+
+            return;
+        }
+
+        $this->reportOk($label, sprintf(
+            '%s (%d %s)',
+            $path,
+            count($names),
+            count($names) === 1 ? 'server' : 'servers'
         ));
     }
 

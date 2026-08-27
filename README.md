@@ -147,7 +147,16 @@ blbackup app:validate [--no-api] [-d|--download=URL]
 ```
 
 `--include` and `--exclude` each take a path to a plain-text file, one hostname
-per line, matched against the server name.
+per line, matched against the server name. Lines are trimmed, so a list edited on
+Windows still matches.
+
+**Prefer configuring them.** `INCLUDE_FILE` and `EXCLUDE_FILE` set the same
+paths, and the options override them for one run. A list that only ever appears
+on the crontab line cannot be shown by `app:config` or checked by `app:validate`,
+so nothing tells you the path is wrong until a run fails on it — and nothing at
+all tells you that a list naming no servers has quietly stopped filtering.
+Neither is set by default, which means every server on the account is backed up;
+that is not treated as a fault.
 
 **`cron`** is the unattended entry point. It runs `create --all --download`
 followed by `clean`, and decides two things from configuration rather than from

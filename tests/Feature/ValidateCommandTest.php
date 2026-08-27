@@ -244,6 +244,54 @@ it('skips the api calls with --no-api', function () {
     Http::assertNothingSent();
 });
 
+it('reports the configured server lists and how many servers they name', function () {
+    fakeApi([fakeServer()]);
+    config([
+        'binarylane.include_file' => writeServerList('include.txt', ['web1.example.com']),
+        'binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com', 'db2.example.com']),
+    ]);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[ ok ] include list')
+        ->and($output)->toContain('(1 server)')
+        ->and($output)->toContain('[ ok ] exclude list')
+        ->and($output)->toContain('(2 servers)');
+});
+
+it('reports an unset server list as a skip rather than a pass', function () {
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[    ] include list')
+        ->and($output)->toContain('[    ] exclude list');
+});
+
+it('fails when a configured server list cannot be read', function () {
+    fakeApi([fakeServer()]);
+    config(['binarylane.exclude_file' => '/no/such/list.txt']);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    // the list decides what gets backed up, so a path that is wrong has to stop
+    // the image being rolled out rather than being noticed on the night
+    expect($exit)->toBe(1)->and($output)->toContain('[fail] exclude list');
+});
+
+it('warns when a configured server list names no servers', function () {
+    fakeApi([fakeServer()]);
+    config(['binarylane.exclude_file' => writeServerList('empty.txt', [])]);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    // a warning, not a failure: it still backs everything up, which is safe -
+    // but nothing else on the machine would ever mention that it stopped filtering
+    expect($exit)->toBe(0)->and($output)->toContain('[warn] exclude list');
+});
+
 it('never prints the api token or the slack webhook', function () {
     fakeApi([fakeServer()]);
     config([

@@ -39,8 +39,9 @@ php blbackup app:build blbackup  # compile a PHAR into builds/ (box.json)
 ```
 
 `--include` / `--exclude` take a path to a plain-text file, one server hostname
-per line, filtered against `$server['name']`. `clean` prompts for confirmation
-unless `--dry-run` or `--no-interaction`.
+per line, filtered against `$server['name']`, and default to
+`binarylane.include_file` / `binarylane.exclude_file` when the option is absent.
+`clean` prompts for confirmation unless `--dry-run` or `--no-interaction`.
 
 ## The pipeline
 
@@ -225,6 +226,23 @@ when it downloaded one and true when one was already there, local or on the
 remote; false only when something went wrong. Return false for the
 already-downloaded case and a re-run of `download --all` reports trouble every
 night, which is the failure mode that makes an exit code worth nothing.
+
+**`BaseCommand::serverList('include'|'exclude')`** resolves the server lists for
+`create` and `download`, which had the same twenty lines twice. The option wins
+for one run; `binarylane.include_file` / `binarylane.exclude_file` is what an
+unattended install is read out of, and exists so that `app:config` can show the
+list and `app:validate` can check it — a path that lives only on the crontab line
+is unverifiable, and the way it fails is the worst kind: the run completes, the
+summary posts, and the servers you thought were covered are not.
+
+Two decisions inside it worth not undoing. **A missing file fails the command**
+rather than being ignored, because a filter that silently did not apply looks
+exactly like a normal night. **A file that names nothing is treated as no list at
+all**, so an empty include list backs up everything rather than nothing — the
+safe way round, since a truncated list must not stop the backups. That second one
+is genuinely surprising, which is why `app:validate` warns about it; nothing else
+on the machine would say a word. Lines are trimmed, because these files get
+edited on Windows and a CRLF list matches no hostname at all.
 
 **`log($level, $message, $logMessage = null, $context = [])`** dual-writes: to
 Monolog (structured, with `$context`) and to the console (styled, gated by a
