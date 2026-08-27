@@ -70,6 +70,23 @@ not the host directory it maps to.
 
 ### As a compiled binary
 
+Each tagged release publishes one on the
+[releases page](https://github.com/hampel/blbackup/releases) — a single
+self-contained PHAR, with a `.sha256` beside it:
+
+```bash
+curl -L -o blbackup https://github.com/hampel/blbackup/releases/latest/download/blbackup
+curl -L -o blbackup.sha256 https://github.com/hampel/blbackup/releases/latest/download/blbackup.sha256
+sha256sum -c blbackup.sha256
+chmod +x blbackup
+./blbackup --version
+```
+
+It needs PHP 8.3 or newer with `ext-intl`, and `zstd`, `wget` and `rclone` on
+the machine — `./blbackup app:validate` checks all of it.
+
+To build one yourself:
+
 ```bash
 composer install
 composer build            # → builds/blbackup

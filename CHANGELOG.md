@@ -6,7 +6,11 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-08-28
+
+The release that 2.0.0's deployment produced. Everything here was found by
+running it on the machine that takes the backups, or by the CI that now runs on
+every push and did not exist before.
 
 ### Added
 
@@ -17,6 +21,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the production server, so its first execution was always on the machine that
   takes the backups, and two defects reached it that way. It also asserts the
   two specific regressions: `/usr/bin/rclone` runs, and `/app/storage` exists.
+- **Released binaries.** Pushing a tag now compiles the PHAR and publishes it to
+  the GitHub releases page with a `.sha256`, gated on the suite and the container
+  image passing first. The job asserts that the binary's own `--version` matches
+  the tag being released — `config/app.php` holds `app('git.version')` and
+  `app:build` compiles its evaluated result in as a literal, so a binary built
+  before its tag ships announcing the previous release with nothing to show it is
+  wrong. That trap now fails the release instead.
 
 ### Added
 
@@ -217,5 +228,6 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.1.0...HEAD
+[2.1.0]: https://github.com/hampel/blbackup/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/hampel/blbackup/compare/1.9.2...2.0.0

@@ -24,6 +24,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default; the release job widens this for itself alone.
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: tests (PHP ${{ matrix.php }})
@@ -129,3 +133,92 @@ jobs:
         run: |
           ./builds/blbackup --version
           ./builds/blbackup list > /dev/null
+
+  release:
+    name: publish the release
+    runs-on: ubuntu-latest
+
+    # Only a tag publishes, and only after everything else has passed. A binary
+    # that other people download is not the place to find out the suite was red.
+    needs: [tests, container, build]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    # The only job that may write to the repository, and it says so here rather
+    # than at the top of the file.
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # app:build takes its version from `git describe --tags`, so without
+          # the history the release would announce itself as "unreleased"
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          extensions: intl
+          coverage: none
+          # box writes a phar, which php refuses to do by default
+          ini-values: phar.readonly=0
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Compile
+        # Compiled here rather than carried over from the build job. Passing the
+        # artefact between jobs would publish the exact binary that was smoke
+        # tested, which is the better property - but it costs two more actions to
+        # pin and keep current, and the same commit compiles to the same thing.
+        # The checks below are the ones that job runs, repeated on what ships.
+        run: composer build
+
+      - name: It runs, and announces the tag it was built from
+        # The trap this guards: config/app.php holds `app('git.version')`, and
+        # app:build evaluates that file on the build machine and compiles the
+        # result in as a literal. Build before tagging and the binary ships
+        # announcing the previous release, with nothing to show it is wrong.
+        run: |
+          ./builds/blbackup list > /dev/null
+
+          built=$(./builds/blbackup --version | awk '{print $NF}')
+
+          if [ "$built" != "$GITHUB_REF_NAME" ]; then
+            echo "The binary says [$built] but the tag is [$GITHUB_REF_NAME]."
+            exit 1
+          fi
+
+          echo "$built"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd builds && sha256sum blbackup > blbackup.sha256)
+
+          # The hand-written entry for this version, which is worth more than
+          # anything generated from the commits. Falls back to generated notes
+          # rather than failing the release if the section is missing.
+          awk -v tag="$GITHUB_REF_NAME" '
+            $0 ~ "^## \\[" tag "\\]" { found = 1; next }
+            found && /^## / { exit }
+            found && /^\[.*\]: http/ { exit }
+            found { print }
+          ' CHANGELOG.md > body.md
+
+          {
+            echo "Needs PHP 8.3 or newer with ext-intl. Download, \`chmod +x\`,"
+            echo "and put a \`.env\` beside the binary - see \`.env.example\`."
+            echo "Verify with \`sha256sum -c blbackup.sha256\`."
+            echo
+          } | cat - body.md > notes.md
+
+          if [ ! -s body.md ]; then
+            gh release create "$GITHUB_REF_NAME" \
+              builds/blbackup builds/blbackup.sha256 \
+              --title "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              builds/blbackup builds/blbackup.sha256 \
+              --title "$GITHUB_REF_NAME" --verify-tag --notes-file notes.md
+          fi
