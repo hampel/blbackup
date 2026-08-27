@@ -51,27 +51,27 @@ class AppValidate extends BaseCommand
         // somewhere to write before it renders anything
         $this->setReportOutput($this->getOutput());
 
-        $this->section("Environment");
+        $this->checkSection("Environment");
         $this->checkPhp();
         $this->checkIntl();
         $this->checkTimezone();
 
-        $this->section("Storage");
+        $this->checkSection("Storage");
         $this->checkStoragePath();
         $this->checkDownloadPath();
         $this->checkLock();
         $this->checkLogging();
 
-        $this->section("External commands");
+        $this->checkSection("External commands");
         $this->checkBinary('zstd', config('binarylane.zstd_binary'), '--version');
         $this->checkBinary('wget', config('binarylane.wget_binary'), '--version');
         $this->checkBinary('rclone', config('binarylane.rclone.binary'), '--version');
         $this->checkRemote();
 
-        $this->section("Run summary");
+        $this->checkSection("Run summary");
         $this->checkSummary();
 
-        $this->section("BinaryLane API");
+        $this->checkSection("BinaryLane API");
         $this->checkApi();
         $this->checkDownload();
 

@@ -101,6 +101,20 @@ so it has to be handed somewhere to write — `setReportOutput($this->getOutput(
 at the top of `handle()`, which both commands do; forget it in a third and the
 first render throws a `LogicException` naming the missing call.
 
+**Two heading styles, on purpose.** `app:validate` heads its groups of checks
+with the package's `checkSection()` — a margined green title that lines up with
+the `[ ok ]` markers beneath it. `cron` heads each stage with
+`BaseCommand::section()`, which is cyan, ruled, and has air either side. That is
+not an oversight to be tidied away: a ruled heading separates stages of work in a
+scrolling run log, which is what gets scanned when a backup has gone wrong
+overnight, and `checkSection()`'s single blank line would be a downgrade there.
+`section()` stays on `BaseCommand` for that one caller. Putting `RendersChecks`
+on `BaseCommand` to unify them would land `checkOk()`, `checksFailed()`,
+`checkExitCode()` and the rest on all ten commands, nine of which check nothing.
+Note `section()` measures its rule with `strlen()`, so a multibyte title
+underlines short — `cron` passes a stage name rather than a literal, so keep the
+stage names ASCII.
+
 Credentials go through `secretStatus()`, never printed: a settings dump is what
 gets pasted into a ticket, and a working token pasted anywhere is a working
 token. Paths go through `path()`, which reports a relative one along with what it

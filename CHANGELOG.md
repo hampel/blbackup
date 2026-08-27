@@ -18,8 +18,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   takes the backups, and two defects reached it that way. It also asserts the
   two specific regressions: `/usr/bin/rclone` runs, and `/app/storage` exists.
 
+### Changed
+
+- **`app:validate`'s section headings now come from `hampel/console-report` 2.1**
+  (`RendersChecks::checkSection()`) rather than from `BaseCommand::section()`.
+  They move to the two-column margin, so a heading lines up with the `[ ok ]`
+  markers under it instead of hanging to their left, and the last Illuminate call
+  in this command's reporting path goes with them — it now writes entirely
+  through `setReportOutput()`. `cron` keeps `BaseCommand::section()` for its
+  stage headings, which is deliberate and explained in `CLAUDE.md`.
+
 ### Fixed
 
+- **`log()` chose the console verbosity with a string where an integer belongs.**
+  `$verbosityMap[$level] ?? 'warning'` reaches `parseVerbosity()`, which knows
+  `v`/`vv`/`vvv`/`quiet`/`normal` and nothing else, so a level the map does not
+  carry silently printed at whatever verbosity the run was given rather than at
+  the intended one. Latent — every current caller passes a mapped level — and now
+  `OutputInterface::VERBOSITY_NORMAL`.
 - **`.env.example` showed an example as though it were the default**, in three
   places. Its header promised every setting was shown with the default it takes
   when left unset, and `LOCK_FILE=/logs/blbackup.lock`, `LOG_STACK=single,slack`

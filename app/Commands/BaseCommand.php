@@ -218,7 +218,12 @@ abstract class BaseCommand extends Command
         ];
 
         $logMessage = $logMessage ?? $message;
-        $verbosity = $verbosityMap[$level] ?? 'warning';
+
+        // an integer, not a string: line() hands this to parseVerbosity(), which
+        // knows v/vv/vvv/quiet/normal and silently falls back to the caller's own
+        // verbosity for anything else - so a level the map does not carry would
+        // print at whatever -v the run happened to be given
+        $verbosity = $verbosityMap[$level] ?? OutputInterface::VERBOSITY_NORMAL;
         $style = $styleMap[$level] ?? null;
 
         Log::log($level, $logMessage, $context);

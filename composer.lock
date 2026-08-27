@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b42246df877b05aede2472b6d2cc1098",
+    "content-hash": "ae2395bc4071799212d6fad268c32d98",
     "packages": [
         {
             "name": "brick/math",
@@ -911,16 +911,16 @@
         },
         {
             "name": "hampel/console-report",
-            "version": "2.0.0",
+            "version": "2.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hampel/console-report.git",
-                "reference": "507a075d64da473f86aedce75177169eca9af638"
+                "reference": "7d2a54ed5906aa495adb1d6e768650222f0ee39d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hampel/console-report/zipball/507a075d64da473f86aedce75177169eca9af638",
-                "reference": "507a075d64da473f86aedce75177169eca9af638",
+                "url": "https://api.github.com/repos/hampel/console-report/zipball/7d2a54ed5906aa495adb1d6e768650222f0ee39d",
+                "reference": "7d2a54ed5906aa495adb1d6e768650222f0ee39d",
                 "shasum": ""
             },
             "require": {
@@ -929,7 +929,7 @@
                 "symfony/console": "^5.4|^6.0|^7.0|^8.0"
             },
             "require-dev": {
-                "hampel/rig": "^0.1.2",
+                "hampel/rig": "^1.1",
                 "illuminate/console": "^12.0|^13.0",
                 "laravel/pint": "^1.30",
                 "phpstan/phpstan": "^2.1.22",
@@ -966,7 +966,7 @@
                 "issues": "https://github.com/hampel/console-report/issues",
                 "source": "https://github.com/hampel/console-report"
             },
-            "time": "2026-08-22T13:15:37+00:00"
+            "time": "2026-08-27T15:11:48+00:00"
         },
         {
             "name": "hampel/slack-message",

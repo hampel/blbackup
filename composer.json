@@ -18,7 +18,7 @@
     "require": {
         "php": "^8.3",
         "ext-intl": "*",
-        "hampel/console-report": "^2.0",
+        "hampel/console-report": "^2.1",
         "hampel/slack-message": "^2.2",
         "illuminate/http": "^13.0",
         "illuminate/log": "^13.0",
