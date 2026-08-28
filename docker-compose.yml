@@ -46,5 +46,9 @@ services:
       # after the current token expires if this is mounted :ro.
       - ./rclone.conf:/root/.config/rclone/rclone.conf
 
-      # Server lists for create/download --include and --exclude.
+      # Server lists. Name the container side in .env - EXCLUDE_FILE=/app/exclude.txt
+      # - rather than passing --exclude on the crontab line: a path that only
+      # appears in cron cannot be shown by app:config or checked by app:validate,
+      # so nothing tells you it is wrong until a run fails on it, and nothing at
+      # all tells you an emptied list has quietly stopped filtering.
       - ./exclude.txt:/app/exclude.txt:ro

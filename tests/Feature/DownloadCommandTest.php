@@ -157,7 +157,7 @@ it('moves the download to the configured remote', function () {
         ->assertSuccessful();
 
     Process::assertRan(fn (PendingProcess $process) => $process->command
-        === "/usr/bin/rclone --progress moveto ".downloadPath($this->path)." remote:backups/{$this->path}");
+        === "/usr/bin/rclone moveto ".downloadPath($this->path)." remote:backups/{$this->path}");
 });
 
 it('reports success when a specific image is downloaded and moved', function () {

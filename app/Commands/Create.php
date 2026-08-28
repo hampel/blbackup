@@ -7,7 +7,6 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
 use Illuminate\Support\Sleep;
-use Symfony\Component\Console\Helper\ProgressBar;
 
 class Create extends BaseCommand
 {
@@ -144,7 +143,7 @@ class Create extends BaseCommand
 
         $action = $this->api->createBackup($server);
 
-        $progress = new ProgressBar($this->output, 100);
+        $progress = $this->progressBar();
         $progress->start();
 
         $timeout = config('binarylane.timeout');

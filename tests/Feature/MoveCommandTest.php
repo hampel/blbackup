@@ -7,10 +7,14 @@ beforeEach(function () {
     $this->path = backupPath();
 });
 
+/**
+ * No --progress: the test output is not decorated, and neither is cron's. rclone
+ * is only asked to repaint a progress block when something is there to draw it.
+ */
 function movedTo(string $source, string $destination): Closure
 {
     return fn (PendingProcess $process) => $process->command
-        === "/usr/bin/rclone --progress moveto {$source} {$destination}";
+        === "/usr/bin/rclone moveto {$source} {$destination}";
 }
 
 function anyMove(): Closure
@@ -162,4 +166,16 @@ it('runs rclone from the storage path', function () {
     // remote against it, so a wrong cwd breaks those remotes only
     Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'moveto')
         && $process->path === storage_path());
+});
+
+
+it('asks rclone for a progress block only when something will draw it', function () {
+    putDownload($this->path, MEGABYTE);
+    fakeBinaries();
+
+    // an hour of --progress repainting twice a second goes to whatever cron
+    // redirects stdout to, and nothing rotates that file
+    $this->artisan('move', ['file' => $this->path, '--ansi' => true])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, ' --progress moveto'));
 });

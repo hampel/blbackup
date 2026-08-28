@@ -6,6 +6,20 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A cron run no longer writes a progress display to a file nobody rotates.**
+  The progress bars and rclone's `--progress` block were drawn unconditionally,
+  so an unattended run redirected to a log wrote tens of thousands of redraw
+  lines describing transfers that had finished — and raw ANSI escapes among
+  them, since the in-place redraw ran whether or not anything could interpret
+  it. Both are now gated on `$output->isDecorated()`, and rclone is no longer
+  asked for `--progress` when nothing will draw it, so the output is not
+  generated rather than merely discarded. Nothing is lost: every figure worth
+  keeping — bytes, elapsed, rate — is logged and summarised when the stage ends.
+
 ## [2.1.0] - 2026-08-28
 
 The release that 2.0.0's deployment produced. Everything here was found by

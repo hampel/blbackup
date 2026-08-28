@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command
@@ -273,6 +275,36 @@ abstract class BaseCommand extends Command
 
         Log::log($level, $logMessage, $context);
         $this->line($message, $style, $verbosity);
+    }
+
+    /**
+     * Whether to draw a live progress display.
+     *
+     * A progress bar and rclone's --progress block exist for somebody watching
+     * them. Under cron nobody is, and the output goes to a file: Symfony writes
+     * every redraw as a fresh line when the stream is not a terminal, and the
+     * in-place redraw writes raw ANSI escapes into it when it thinks it is. An
+     * hour of rclone --progress refreshing twice a second is tens of thousands
+     * of lines describing a transfer that finished, in a file nothing rotates.
+     *
+     * Nothing is lost by not drawing it. Every figure worth keeping - bytes,
+     * elapsed, rate - is logged and summarised when the stage finishes.
+     */
+    protected function drawsProgress() : bool
+    {
+        return $this->output->isDecorated() && !$this->output->isQuiet();
+    }
+
+    /**
+     * A progress bar, or one wired to a NullOutput that draws nothing.
+     *
+     * Returning a real object either way keeps the callers free of conditionals
+     * around every start(), setProgress() and finish() - they are inside process
+     * callbacks, where writing anything to the console breaks the redraw.
+     */
+    protected function progressBar(int $max = 100) : ProgressBar
+    {
+        return new ProgressBar($this->drawsProgress() ? $this->output : new NullOutput(), $max);
     }
 
     protected function logCmd($description, $cmd)

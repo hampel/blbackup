@@ -129,7 +129,13 @@ class Move extends BaseCommand
 
         $verbosity = $this->getVerbosity();
         $dryrun = $this->option('dry-run') ? ' --dry-run' : '';
-        $cmd = "{$rclone}{$verbosity}{$dryrun} --progress moveto {$sourcePath} {$remotePath}";
+
+        // asked for only when something will draw it. --progress makes rclone
+        // repaint a block twice a second for the length of a multi-gigabyte
+        // transfer, and under cron that lands in a file nothing rotates
+        $progress = $this->drawsProgress() ? ' --progress' : '';
+
+        $cmd = "{$rclone}{$verbosity}{$dryrun}{$progress} moveto {$sourcePath} {$remotePath}";
 
         $this->logCmd('rclone moveto', $cmd);
 
@@ -142,7 +148,7 @@ class Move extends BaseCommand
 
         $start = now();
 
-        $result = $this->processRclone($cmd, storage_path(), true);
+        $result = $this->processRclone($cmd, storage_path(), $this->drawsProgress());
 
         if ($result->successful())
         {

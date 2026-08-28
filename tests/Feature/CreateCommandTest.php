@@ -247,7 +247,7 @@ it('passes --move through to the download', function () {
         ->assertSuccessful();
 
     Process::assertRan(fn (PendingProcess $process) => $process->command
-        === '/usr/bin/rclone --progress moveto '.downloadPath(backupPath())." remote:backups/".backupPath());
+        === '/usr/bin/rclone moveto '.downloadPath(backupPath())." remote:backups/".backupPath());
 });
 
 it('does not download a backup that failed', function () {

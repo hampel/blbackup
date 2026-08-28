@@ -9,7 +9,6 @@ use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
-use Symfony\Component\Console\Helper\ProgressBar;
 
 class Download extends BaseCommand
 {
@@ -379,7 +378,7 @@ class Download extends BaseCommand
 
     protected function downloadHttp(string $url, string $path) : void
     {
-        $progress = new ProgressBar($this->output, 100);
+        $progress = $this->progressBar();
         $progress->start();
 
         $this->api->download(
@@ -427,7 +426,7 @@ class Download extends BaseCommand
         $lineCount = 0;
         $last = '';
 
-        $progress = new ProgressBar($this->output, 100);
+        $progress = $this->progressBar();
 
         $result = Process::forever()
             ->path($path)
