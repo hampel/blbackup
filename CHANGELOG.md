@@ -6,7 +6,7 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.1] - 2026-08-28
 
 ### Fixed
 
@@ -242,6 +242,7 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.1.0...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.1.1...HEAD
+[2.1.1]: https://github.com/hampel/blbackup/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/hampel/blbackup/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/hampel/blbackup/compare/1.9.2...2.0.0
