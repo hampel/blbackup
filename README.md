@@ -227,6 +227,12 @@ One line:
           docker compose run --rm blbackup php blbackup cron >> /var/log/blbackup/cron.log 2>&1
 ```
 
+**`>>` grows without limit**, and nothing rotates that file for you. A run writes
+little now — progress displays are drawn only when the output is decorated, which
+under cron it is not — but little is not nothing. Point it at logrotate, truncate
+it with `>` instead of appending, or wrap the line in a script that keeps the
+tail; the tool has no opinion, but the file needs a ceiling from somewhere.
+
 **Exit codes are the contract with cron.** Every command returns non-zero if any
 part of its work failed, and keeps going through the rest rather than stopping
 at the first failure — so what is reported is everything that went wrong, not
