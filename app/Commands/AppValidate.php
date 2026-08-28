@@ -53,6 +53,7 @@ class AppValidate extends BaseCommand
         $this->setReportOutput($this->getOutput());
 
         $this->checkSection("Environment");
+        $this->checkVersion();
         $this->checkPhp();
         $this->checkIntl();
         $this->checkTimezone();
@@ -97,6 +98,32 @@ class AppValidate extends BaseCommand
 
         // a warning is not a failure
         return $this->checkExitCode();
+    }
+
+    /**
+     * What this install calls itself.
+     *
+     * The first thing worth knowing after a rebuild is whether the thing you
+     * just deployed is the thing you meant to deploy, and until now this command
+     * - the one a rollout is gated on - was the only place that did not say.
+     *
+     * A warning rather than a pass when it is unknown, because "unreleased" is
+     * not cosmetic: AppServiceProvider signs every Slack run summary with
+     * app()->version(), so the alerts from that install are signed with it too,
+     * and nothing in the channel then says which build produced them.
+     */
+    protected function checkVersion() : void
+    {
+        $version = $this->app->version();
+
+        if ($version === 'unreleased' || $version === '')
+        {
+            $this->reportWarn('Version', 'unknown - no git metadata here, so build with --build-arg VERSION=<tag>');
+
+            return;
+        }
+
+        $this->reportOk('Version', $version);
     }
 
     protected function checkPhp() : void

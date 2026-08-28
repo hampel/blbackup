@@ -30,6 +30,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // config/app.php has already been loaded by the time providers register,
+        // so this overrides what `git describe` could not work out - in a
+        // container, where there is no .git and no git binary. Left alone when
+        // nothing is configured, so a checkout and a compiled binary keep
+        // reporting the tag they really came from.
+        if ($version = config('binarylane.version'))
+        {
+            config(['app.version' => $version]);
+        }
+
         $this->app->bind(
             \Illuminate\Contracts\Log\ContextLogProcessor::class,
             \Illuminate\Log\Context\ContextLogProcessor::class

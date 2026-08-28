@@ -6,6 +6,31 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`app:validate` reports the version.** The first thing worth knowing after a
+  rebuild is whether what you deployed is what you meant to, and the command a
+  rollout is gated on was the only place that did not say. A warning rather than
+  a pass when it cannot tell, which is what catches the fix below being skipped.
+
+### Fixed
+
+- **A container called itself `unreleased`, and signed its Slack summaries with
+  it.** `app.version` comes from `git describe`, and an image has neither a
+  `.git` directory nor a git binary — so `app:config` reported `unreleased` and,
+  because `AppServiceProvider` signs the run summary with `app()->version()`,
+  every alert from that install was signed with it too. Nothing in the channel
+  said which build produced an alert. The `Dockerfile` now takes a `VERSION`
+  build argument, and `AppServiceProvider` applies it over `app.version`:
+
+      VERSION=$(git describe --tags --abbrev=0) docker compose build
+
+  Applied in the provider rather than read in `config/app.php`, because an
+  `env()` call in that file freezes at build time for everything in it. A
+  checkout and a compiled binary are unaffected — both already knew.
+
 ## [2.1.1] - 2026-08-28
 
 ### Fixed

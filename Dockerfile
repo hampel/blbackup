@@ -73,6 +73,20 @@ COPY . .
 
 RUN composer dump-autoload --no-dev --optimize
 
+# What this image calls itself. .dockerignore leaves .git out and there is no git
+# binary here, so `git describe` - which is where app.version comes from - finds
+# nothing and falls back to "unreleased". That is then what app:config reports
+# and what every Slack run summary is signed with.
+#
+# Pass it at build time:
+#
+#   docker compose build --build-arg VERSION=$(git describe --tags --abbrev=0)
+#
+# Forgetting is not silent: app:validate warns that the version is unknown, and
+# app:validate is the gate a rebuild has to pass anyway.
+ARG VERSION=
+ENV BLBACKUP_VERSION=${VERSION}
+
 # No command by default prints the command list and exits 0 - cron supplies the
 # command it wants, which for a nightly run is:
 #   docker compose run --rm blbackup php blbackup cron

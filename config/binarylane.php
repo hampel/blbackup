@@ -12,6 +12,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Version
+    |--------------------------------------------------------------------------
+    |
+    | What this build calls itself, when it cannot work that out for itself.
+    |
+    | app.version is app('git.version'), which shells out to `git describe`. In a
+    | container there is neither a .git directory nor a git binary, so it falls
+    | back to the string "unreleased" - and that is what app:config reports and
+    | what every Slack run summary is signed with, because AppServiceProvider
+    | builds the signature from app()->version().
+    |
+    | Set at image build time, from a build argument. Not something an install
+    | normally sets by hand, and pointless in a compiled binary: app:build
+    | evaluates config/app.php on the build machine and compiles the version in
+    | as a literal, so a phar already knows the tag it was built from.
+    |
+    | AppServiceProvider applies this over app.version rather than config/app.php
+    | reading it directly, because an env() call in that file freezes at build
+    | time for every setting in it - see the note at the top of .env.example.
+    |
+    */
+
+    'version' => env('BLBACKUP_VERSION'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Timeout
     |--------------------------------------------------------------------------
     |

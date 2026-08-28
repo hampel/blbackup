@@ -244,6 +244,27 @@ it('skips the api calls with --no-api', function () {
     Http::assertNothingSent();
 });
 
+it('reports the version this install calls itself', function () {
+    fakeApi([fakeServer()]);
+    config(['app.version' => '9.9.9']);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] Version')->toContain('9.9.9');
+});
+
+it('warns when it cannot tell what version it is', function () {
+    fakeApi([fakeServer()]);
+
+    // what a container reports: no .git and no git binary, so `git describe`
+    // finds nothing. Not cosmetic - every Slack run summary is signed with this
+    config(['app.version' => 'unreleased']);
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    expect($exit)->toBe(0)->and($output)->toContain('[warn] Version')->toContain('--build-arg');
+});
+
 it('reports the configured server lists and how many servers they name', function () {
     fakeApi([fakeServer()]);
     config([

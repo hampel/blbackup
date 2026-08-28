@@ -23,8 +23,19 @@
 
 services:
   blbackup:
-    build: .
     image: blbackup
+
+    build:
+      context: .
+      args:
+        # So the image knows what it is. Without it app:config says "unreleased"
+        # and so does every Slack run summary, because there is no .git and no
+        # git binary in the image for `git describe` to use:
+        #
+        #   VERSION=$(git describe --tags --abbrev=0) docker compose build
+        #
+        # app:validate warns when it was not passed.
+        VERSION: ${VERSION:-}
 
     volumes:
       # Where downloaded backups land. DOWNLOAD_PATH in .env must name the

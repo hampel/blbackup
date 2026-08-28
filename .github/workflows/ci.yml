@@ -67,7 +67,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build the image
-        run: docker build -t blbackup:ci .
+        # VERSION is how the image is told what it is: there is no .git and no
+        # git binary inside, so app.version would otherwise fall back to
+        # "unreleased" - which app:config reports and every Slack run summary is
+        # signed with.
+        run: docker build --build-arg VERSION=ci-version-check -t blbackup:ci .
 
       - name: The machine can do what the configuration says
         # --no-api keeps this off the BinaryLane API and off Slack, so it needs
@@ -92,6 +96,11 @@ jobs:
           # still has to exist, because every rclone call runs from there and
           # Symfony's Process will not start when its cwd does not
           docker run --rm blbackup:ci test -d /app/storage
+
+          # the build argument reached app.version, rather than the image
+          # quietly calling itself "unreleased"
+          docker run --rm blbackup:ci php blbackup app:config --only=application \
+            | grep -q 'ci-version-check'
 
           # a mistyped command must exit non-zero: this tool's exit code is the
           # whole of what cron reads

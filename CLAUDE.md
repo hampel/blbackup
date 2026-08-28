@@ -299,6 +299,21 @@ remote, and the timezone. Read it through `config()`, never `env()` outside
 itself is gitignored, and `app:config` is the way to see what a given install
 resolved to.
 
+**The version has three sources, and which one answers depends on how it is
+running.** `config/app.php` holds `app('git.version')`, which shells out to
+`git describe --tags --abbrev=0`: a checkout answers from its tags, and
+`app:build` compiles the evaluated result into a phar as a literal, so a binary
+knows the tag it came from. A **container has neither a `.git` directory nor a
+git binary**, so it falls back to the string `unreleased` — and that is not
+cosmetic, because `AppServiceProvider` signs every Slack run summary with
+`app()->version()`, so the alerts from that install are signed `unreleased` too.
+`BLBACKUP_VERSION` is how the image is told, taken from a `VERSION` build
+argument in the `Dockerfile`, and `AppServiceProvider::register()` applies it
+over `app.version` — config is already loaded by the time providers register.
+It is applied there rather than read in `config/app.php` because of the rule
+below. Forgetting the build argument is not silent: `app:validate` warns, and it
+is the gate a rebuild has to pass anyway.
+
 **Never put an `env()` call in `config/app.php`.** `app:build` evaluates that file
 on the build machine and compiles it in as a literal array, so the value freezes
 at build time and no `.env` beside the binary can change it. That is why the
