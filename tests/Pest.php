@@ -1,5 +1,8 @@
 <?php
 
+use App\Support\SlackSummary;
+use GuzzleHttp\Client;
+use Hampel\SlackMessage\SlackWebhook;
 use Illuminate\Http\Client\Request;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
@@ -47,6 +50,12 @@ uses(Tests\TestCase::class)
             // the project .env is loaded in tests too, and without this the
             // suite appends to whatever log the developer has configured
             'logging.default' => 'null',
+
+            // and without this it posted to whatever Slack channel the developer
+            // has configured - 41 real messages per run, measured. SlackSummary
+            // is resolved from the container with a real Guzzle client, which
+            // Http::fake() cannot see, so nothing else here was going to stop it
+            'binarylane.summary.slack_webhook' => null,
         ]);
 
         // repoints the downloads disk at storage/framework/testing and empties
@@ -231,6 +240,32 @@ function wgetWrites(int $bytes): Closure
  * Write a server list of the kind create's --include / --exclude take, and
  * return the absolute path to it.
  */
+/**
+ * Put a recording transport behind every Slack post, and answer them all with
+ * an "ok" nobody had to be online for.
+ *
+ * Worth having even though the webhook is pinned empty above, because the two
+ * guard against different mistakes: the pin stops the suite posting, and a test
+ * built on this proves it, against the day somebody unpins it. Http::fake() is
+ * no help here - SlackWebhook is handed a real Guzzle client by
+ * AppServiceProvider, and the Http facade never sees it.
+ *
+ * @param array $sent filled with the uri of every message posted
+ */
+function recordingSlack(array &$sent): void
+{
+    $handler = function ($request, $options) use (&$sent) {
+        $sent[] = (string) $request->getUri();
+
+        return new GuzzleHttp\Promise\FulfilledPromise(new GuzzleHttp\Psr7\Response(200, [], 'ok'));
+    };
+
+    app()->instance(SlackWebhook::class, new SlackWebhook(new Client(['handler' => $handler])));
+
+    // the reporter is a singleton and may already hold the real transport
+    app()->forgetInstance(SlackSummary::class);
+}
+
 /**
  * Hold the backup lock, as another run would.
  *

@@ -101,3 +101,14 @@ it('still expires when the backups failed, and reports failure', function () {
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'lsjson -R'));
 });
+
+it('posts nothing to slack when the suite runs it', function () {
+    // the other half of the guard in ValidateCommandTest: cron posts a summary
+    // of its own at the end of every run, through the same container singleton
+    $sent = [];
+    recordingSlack($sent);
+
+    $this->artisan('cron')->assertSuccessful();
+
+    expect($sent)->toBe([]);
+});

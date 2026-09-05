@@ -445,3 +445,19 @@ it('fails when the transfer cannot be made', function () {
 
     expect(Storage::disk('downloads')->allFiles(''))->toBe([]);
 });
+
+it('posts nothing to slack when the suite runs it', function () {
+    // this is a guard on tests/Pest.php, not on the command. Before the webhook
+    // was pinned there, the project .env supplied a real one and a full suite run
+    // posted 41 messages to a live channel - measured, not estimated
+    fakeApi([fakeServer()]);
+
+    $sent = [];
+    recordingSlack($sent);
+
+    [$exit, $output] = validate();
+
+    expect($sent)->toBe([])
+        ->and($exit)->toBe(0)
+        ->and($output)->toContain('[    ] run summary');
+});
