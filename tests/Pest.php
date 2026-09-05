@@ -56,6 +56,11 @@ uses(Tests\TestCase::class)
             // is resolved from the container with a real Guzzle client, which
             // Http::fake() cannot see, so nothing else here was going to stop it
             'binarylane.summary.slack_webhook' => null,
+
+            // the shipped default rather than the developer's: a test that says
+            // how many records a threshold posts has to be reading the threshold
+            // this project ships, not the one in the .env beside the suite
+            'logging.channels.slack.level' => 'critical',
         ]);
 
         // repoints the downloads disk at storage/framework/testing and empties

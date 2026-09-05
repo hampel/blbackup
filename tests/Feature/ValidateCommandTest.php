@@ -321,6 +321,12 @@ it('never prints the api token or the slack webhook', function () {
         'logging.channels.slack.url' => 'https://hooks.slack.com/services/SECRET/WEBHOOK/VALUE',
     ]);
 
+    // without this the level sweep is routed through Monolog's slack handler to
+    // the url above, and really posts - four requests to hooks.slack.com, which
+    // 404 and so never fail the test. Http::fake() does not reach the handler;
+    // taking the logger out from under it is what does
+    Log::spy();
+
     // this output is what gets pasted into a support ticket
     [$exit, $output] = validate();
 
