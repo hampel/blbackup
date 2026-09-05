@@ -343,11 +343,47 @@ that it took — it writes a real record at every level rather than reporting th
 the file looks writable.
 
 **`app:validate` posts to Slack**, if a webhook is configured. That is
-deliberate and is why the levels are not behind a flag: a destination with a
-threshold only proves it works when something at that level is really sent, and
-a revoked webhook is invisible from the sending end — the alert simply never
-arrives, which looks exactly like a run where nothing went wrong. Say so before
-anyone runs it on a machine whose Slack channel other people watch.
+deliberate and is why the levels are not behind a flag by default: a destination
+with a threshold only proves it works when something at that level is really
+sent, and a revoked webhook is invisible from the sending end — the alert simply
+never arrives, which looks exactly like a run where nothing went wrong. Say so
+before anyone runs it on a machine whose Slack channel other people watch.
+
+**It sends two things, not one, and the loud one hides the quiet one.** The
+eight-level sweep is what anybody notices; `checkSummary()` posts a test message
+to a *different* webhook — `BLBACKUP_SUMMARY_SLACK_WEBHOOK` rather than the log
+channel — and qualifies on exactly the same test. Count the sends before
+touching anything that gates them; do not reason outward from the one you
+noticed.
+
+**`--unattended` suppresses exactly those two and nothing else**, and states a
+condition rather than a preference: the network is fine, but nobody is watching
+where these land. It is deliberately not `--offline`, which is the fleet's name
+for suppressing everything that leaves the machine — that would drop the rclone
+remote probe and the API calls too, and a remote that stopped answering is
+exactly what a rebuild gate exists to surface. `--offline` would imply
+`--unattended`; not the reverse. Three things follow that are worth not undoing:
+
+- **It is never the default.** Forgetting it costs channel noise somebody can
+  delete; defaulting it on would cost every future run its proof of delivery,
+  silently, which is not recoverable by noticing.
+- **Both suppressed checks report as skips**, never as omissions — a check that
+  quietly did not run is how a check that does nothing goes unnoticed.
+- **A warning or a failure is still logged**, even though those records reach
+  the same channel. That half of the output is written for whoever is *not* at
+  the terminal, which is precisely who `--unattended` says is running it.
+
+**An attended run has to say what it sent**, because the operator cannot check
+what they were not told to expect. `checkDelivery()` prints the count and the
+levels — `posted 4 records at error and above` — derived from the effective
+stack and that channel's threshold rather than written down, so the line cannot
+drift from the configuration it describes. Note the driver test in there says
+*what to look for* and is not how to bound the sweep: `papertrail` is
+`driver => monolog` and leaves the machine just as surely, so gating the loop on
+the driver would send all eight off the box rather than none.
+
+The pattern, and the argument for each of those decisions, is written up at
+`/srv/www/validate-and-config.html`; `wback` is the reference implementation.
 
 `config/logging.php` stamps every record with `logging.hostname` through the
 `StampHostname` tap, so one webhook can serve more than one installation. It has

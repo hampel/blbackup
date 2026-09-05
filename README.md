@@ -160,7 +160,7 @@ blbackup move     <file>|--all [--remote=REMOTE] [--dry-run]
 blbackup clean    [--days=N] [--remote] [--dry-run]
 
 blbackup app:config   [--only=SECTION]
-blbackup app:validate [--no-api] [-d|--download=URL]
+blbackup app:validate [--no-api] [--unattended] [-d|--download=URL]
 ```
 
 `--include` and `--exclude` each take a path to a plain-text file, one hostname
@@ -306,6 +306,31 @@ only proves it works when something at that level is really sent, and a revoked
 webhook is invisible from the sending end — the alert simply never arrives,
 which looks exactly like a run where nothing went wrong. Say so before running
 it on a machine whose Slack channel other people watch.
+
+It sends two things. The record it writes at every log level goes wherever
+`LOG_STACK` routes it, and a separate test message goes to
+`BLBACKUP_SUMMARY_SLACK_WEBHOOK`. An attended run reports what the first one
+posted — `posted 4 records at error and above: error, critical, alert,
+emergency` — so the count can be compared against the channel. Four records at a
+threshold of `error` is right; three means the threshold is not what the
+configuration says.
+
+**`--unattended` suppresses both**, and nothing else — every binary, path, lock,
+remote and API call still runs, and the two sends are reported as skips rather
+than quietly left out. Use it when the network is fine but nobody is watching
+where the messages land: a scripted rebuild, a smoke test in a pipeline, a
+`for host in …` loop. It is not a quiet mode and it is not the default, because
+forgetting it costs some noise you can delete, while having it on by default
+would cost every run its proof of delivery without saying so.
+
+A warning or a failure is still written to the log under `--unattended`. That is
+the half of this command's output meant for whoever is not at the terminal, and
+`--unattended` is the run where that is everybody.
+
+Do not try to get the same effect by blanking a webhook on the command line.
+`.env` is loaded mutably, so `BLBACKUP_SUMMARY_SLACK_WEBHOOK= blbackup
+app:validate` keeps the value from the file and sends anyway — it looks like a
+second layer behind the flag and is not a layer at all.
 
 ## Development
 

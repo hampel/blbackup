@@ -26,6 +26,7 @@ class AppValidate extends BaseCommand
      */
     protected $signature = 'app:validate
                             {--no-api : skip the checks that call the BinaryLane API}
+                            {--unattended : do not send the messages whose only proof is a person seeing them arrive}
                             {--d|download= : download this URL to the download path, to exercise the transfer end to end}';
 
     /**
@@ -219,10 +220,11 @@ class AppValidate extends BaseCommand
     /**
      * The same shape as wback's, so the two tools report their logging alike.
      *
-     * Records are written at every level on every run, not behind a flag: a
-     * destination with a threshold - Slack at critical - only proves it works
-     * when something at that level is actually sent, and a webhook that has
-     * been revoked says nothing about it at this end. The run posts.
+     * Records are written at every level on every attended run: a destination
+     * with a threshold - Slack at critical - only proves it works when something
+     * at that level is actually sent, and a webhook that has been revoked says
+     * nothing about it at this end. The run posts. --unattended is the only way
+     * to stop it, and states that nobody is watching where they would land.
      */
     protected function checkLogging() : void
     {
@@ -310,9 +312,18 @@ class AppValidate extends BaseCommand
     /**
      * Write a record at every level, and say so - the console cannot know what
      * arrived at the other end, only that it was sent.
+     *
+     * Skipped under --unattended, which is the one condition that makes the
+     * sweep not worth its cost: the records prove the webhook and the threshold
+     * by arriving, and nothing is proved by arriving where nobody is looking.
+     * Never the default, though - forgetting the flag costs some channel noise
+     * that can be deleted, while defaulting it on would cost every future run
+     * its proof of delivery, silently, which cannot be undone by noticing.
      */
     protected function writeTestRecords() : void
     {
+        $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+
         if ($this->loggingStopped)
         {
             $this->reportSkip('log records', 'not written - the destination above cannot be written');
@@ -320,7 +331,14 @@ class AppValidate extends BaseCommand
             return;
         }
 
-        $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+        if ($this->option('unattended'))
+        {
+            $this->reportSkip('log records', 'nothing was written - --unattended');
+
+            $this->checkDelivery($levels);
+
+            return;
+        }
 
         foreach ($levels as $level)
         {
@@ -338,13 +356,96 @@ class AppValidate extends BaseCommand
 
         $this->reportOk('log records', 'a message was written at every level');
 
-        $this->line('         check that your logs - and any webhook - received them');
+        $this->checkDelivery($levels);
+    }
+
+    /**
+     * Say what the sweep just posted, because a count nobody was given is not a
+     * count anybody can check.
+     *
+     * The sweep is the only thing that proves the Slack threshold: the webhook
+     * url and LOG_SLACK_LEVEL are both unprovable from this end, and the records
+     * arriving prove both at once. That only works if the operator is told how
+     * many to expect - four is right for a level of `error`, and three means the
+     * threshold is not what the configuration says. Derived from the effective
+     * stack rather than written down, or the line becomes a second thing to keep
+     * in step with the configuration it is describing.
+     *
+     * Note what the driver test here is for. It says what to go and look for; it
+     * is emphatically not how to bound the sweep. `papertrail` is
+     * driver => monolog and leaves the machine just as surely, so gating the loop
+     * on the driver would send all eight off the box rather than none. The flag
+     * bounds the sweep; this only reports on it.
+     *
+     * @param array<int, string> $levels every level the sweep writes at, lowest first
+     */
+    protected function checkDelivery(array $levels) : void
+    {
+        $channel = config('logging.default');
+
+        $channels = $channel === 'stack' ? config('logging.channels.stack.channels', []) : [$channel];
+
+        $slack = array_values(array_filter(
+            array_map('trim', $channels),
+            fn ($name) => config("logging.channels.{$name}.driver") === 'slack'
+        ));
+
+        if ($slack === [])
+        {
+            $this->reportSkip('log delivery', 'nothing in the log stack posts to slack');
+
+            return;
+        }
+
+        foreach ($slack as $name)
+        {
+            // checkLogChannel() has already failed the run over a channel with no
+            // webhook, which is the state that otherwise looks identical to a
+            // working one from in here - so there is nothing left to say about it
+            if (empty(config("logging.channels.{$name}.url")))
+            {
+                continue;
+            }
+
+            if ($this->option('unattended'))
+            {
+                $this->reportSkip("log delivery ({$name})", 'nothing was posted - --unattended');
+
+                continue;
+            }
+
+            $threshold = config("logging.channels.{$name}.level");
+            $index = array_search(strtolower((string) $threshold), $levels, true);
+
+            if ($index === false)
+            {
+                // an unrecognised level is Monolog's to reject, not ours to guess at
+                $this->reportWarn("log delivery ({$name})", "cannot tell what was posted - [{$threshold}] is not a log level");
+
+                continue;
+            }
+
+            $posted = array_slice($levels, $index);
+
+            $this->reportOk("log delivery ({$name})", sprintf(
+                'posted %d %s at %s and above: %s - check they arrived',
+                count($posted),
+                count($posted) === 1 ? 'record' : 'records',
+                $threshold,
+                implode(', ', $posted)
+            ));
+        }
     }
 
     /**
      * Post the test message, because a webhook that has stopped working says
      * nothing about it at this end - the summary simply never arrives, which
      * looks exactly like a backup that never ran.
+     *
+     * The second of this command's two sends, and it was worth going looking for
+     * rather than reasoning outward from the loud one: the eight-level sweep is
+     * what anybody notices, and one message beside it does not look like a flood,
+     * which is precisely how it would have survived the flag.
      */
     protected function checkSummary() : void
     {
@@ -353,6 +454,16 @@ class AppValidate extends BaseCommand
         if (!$reporter->isConfigured())
         {
             $this->reportSkip('run summary', 'nothing is sent - set BLBACKUP_SUMMARY_SLACK_WEBHOOK');
+
+            return;
+        }
+
+        // the same reasoning as the log sweep: this webhook is proved by the
+        // message arriving, so there is nothing to prove by spending one on a
+        // channel nobody has been asked to read
+        if ($this->option('unattended'))
+        {
+            $this->reportSkip('run summary', 'configured, but nothing was sent - --unattended');
 
             return;
         }
@@ -524,6 +635,13 @@ class AppValidate extends BaseCommand
      * Write to the log, but never let the log break the validation: one of the
      * things being checked is whether the log destination can be written at
      * all, and Monolog throws when it cannot.
+     *
+     * Deliberately not suppressed by --unattended, although these records can
+     * reach the same Slack channel the sweep does. A warning or a failure is the
+     * half of this command's output written for whoever is not at the terminal,
+     * and --unattended states that nobody is - which makes it the run where the
+     * record matters most, not least. The flag is about sends whose only value
+     * is a person seeing them arrive; this one has value sitting in the log.
      */
     protected function record(string $level, string $message, array $context = []) : void
     {

@@ -6,6 +6,44 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`app:validate --unattended`.** The command sends two things whose only proof
+  is a person seeing them arrive: the record it writes at every log level, and
+  the run summary test post. Those sends are the point — a webhook url and
+  `LOG_SLACK_LEVEL` are both unprovable from the sending end, and records landing
+  at the configured threshold prove both at once — so the flag suppresses exactly
+  those two and nothing else. Every binary, path, lock, remote and API call still
+  runs. Use it when the network is fine but nobody is watching where the messages
+  land.
+
+  It is deliberately not `--offline`, which is this fleet's name for suppressing
+  everything that leaves the machine: that would drop the rclone remote probe,
+  and a remote that stopped answering is exactly what a rebuild gate exists to
+  surface. Never the default, and both suppressed checks report as skips rather
+  than vanishing.
+
+- **An attended run now says what it posted.** `posted 4 records at error and
+  above: error, critical, alert, emergency — check they arrived`, derived from
+  the effective log stack and that channel's threshold. Sending was previously
+  unverifiable in practice, because nobody was told what to expect: four records
+  is right for a threshold of `error`, and three means the threshold is not what
+  the configuration says.
+
+### Fixed
+
+- **The test suite posted to a live Slack channel.** A full run sent 41 real
+  messages to whatever webhook the developer had in `.env`, and separately made
+  four requests to `hooks.slack.com` through Monolog. Three reasonable decisions
+  lined up to allow it: the project `.env` is loaded during tests, `SlackSummary`
+  is built from config by the service provider, and the transport under it is a
+  real Guzzle client rather than the `Http` facade — so `Http::fake()` never saw
+  the requests and none of the existing fakes were going to stop them. The
+  webhook and the Slack log level are now pinned alongside the API token and the
+  binaries, and two tests fail if anyone unpins them.
+
 ## [2.2.0] - 2026-08-28
 
 ### Added

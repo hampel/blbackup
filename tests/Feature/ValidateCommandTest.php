@@ -336,7 +336,7 @@ it('never prints the api token or the slack webhook', function () {
         ->not->toContain('test-token');
 });
 
-it('writes a record at every level on every run', function () {
+it('writes a record at every level on every attended run', function () {
     fakeApi([fakeServer()]);
     config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
 
@@ -346,8 +346,9 @@ it('writes a record at every level on every run', function () {
 
     expect($exit)->toBe(0)->and($output)->toContain('a message was written at every level');
 
-    // not behind a flag: a Slack channel at critical only proves it works when
-    // something at that level is really sent
+    // not behind a flag by default: a Slack channel at critical only proves it
+    // works when something at that level is really sent. --unattended is the one
+    // thing that stops it, and is covered below
     foreach (['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'] as $level)
     {
         Log::shouldHaveReceived('log')->with($level, "Validation test message [{$level}]");
@@ -466,4 +467,117 @@ it('posts nothing to slack when the suite runs it', function () {
     expect($sent)->toBe([])
         ->and($exit)->toBe(0)
         ->and($output)->toContain('[    ] run summary');
+});
+
+it('sends nothing whose only proof is somebody seeing it with --unattended', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    $sent = [];
+    recordingSlack($sent);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
+    app()->forgetInstance(App\Support\SlackSummary::class);
+
+    Log::spy();
+
+    [$exit, $output] = validate(['--unattended' => true]);
+
+    expect($exit)->toBe(0)
+        ->and($sent)->toBe([])
+        ->and($output)->toContain('[    ] log records')
+        ->toContain('[    ] run summary')
+        ->toContain('--unattended');
+
+    foreach (['debug', 'error', 'emergency'] as $level)
+    {
+        Log::shouldNotHaveReceived('log', [$level, "Validation test message [{$level}]"]);
+    }
+});
+
+it('still records its own warnings and failures with --unattended', function () {
+    // the half of the output written for whoever is not at the terminal, which
+    // is precisely who --unattended says is running it
+    fakeApi([fakeServer()]);
+    config([
+        'logging.default' => 'single',
+        'logging.channels.single.path' => storage_path('probe.log'),
+        'binarylane.timezone' => 'Mars/Olympus_Mons',
+    ]);
+
+    Log::spy();
+
+    [$exit] = validate(['--unattended' => true]);
+
+    expect($exit)->toBe(1);
+
+    Log::shouldHaveReceived('log')->with('error', 'Validation failure', [
+        'label' => 'Timezone',
+        'detail' => '[Mars/Olympus_Mons] is not a known timezone',
+    ]);
+});
+
+it('says how many records the sweep posted, and at what', function () {
+    // a count nobody was given is not a count anybody can check: four records is
+    // right for a threshold of error, and three means it is not what config says
+    fakeApi([fakeServer()]);
+    config([
+        'logging.default' => 'stack',
+        'logging.channels.stack.channels' => ['slack'],
+        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.level' => 'error',
+    ]);
+
+    Log::spy();
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[ ok ] log delivery (slack)')
+        ->toContain('posted 4 records at error and above: error, critical, alert, emergency');
+});
+
+it('derives that count rather than reciting one', function () {
+    fakeApi([fakeServer()]);
+    config([
+        'logging.default' => 'stack',
+        'logging.channels.stack.channels' => ['slack'],
+        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.level' => 'emergency',
+    ]);
+
+    Log::spy();
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('posted 1 record at emergency and above: emergency');
+});
+
+it('has nothing to say about delivery when nothing in the stack posts to slack', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[    ] log delivery')
+        ->toContain('nothing in the log stack posts to slack');
+});
+
+it('does not guess when the threshold is not a log level', function () {
+    fakeApi([fakeServer()]);
+    config([
+        'logging.default' => 'stack',
+        'logging.channels.stack.channels' => ['slack'],
+        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.level' => 'loud',
+    ]);
+
+    Log::spy();
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] log delivery (slack)')
+        ->toContain('[loud] is not a log level');
 });

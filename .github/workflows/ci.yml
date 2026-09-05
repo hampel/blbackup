@@ -74,10 +74,17 @@ jobs:
         run: docker build --build-arg VERSION=ci-version-check -t blbackup:ci .
 
       - name: The machine can do what the configuration says
-        # --no-api keeps this off the BinaryLane API and off Slack, so it needs
-        # no credentials - and still runs every binary, takes the lock, probes
-        # the download path and writes a real log record at every level. The
-        # token is only checked for presence, never used.
+        # --no-api keeps this off the BinaryLane API, so it needs no credentials
+        # - and still runs every binary, takes the lock, probes the download path
+        # and writes a real log record at every level. The token is only checked
+        # for presence, never used.
+        #
+        # Deliberately NOT --unattended, and deliberately not relying on --no-api
+        # to keep it off Slack either, which it has never done. Nothing is posted
+        # here because no webhook is configured: .dockerignore keeps .env out of
+        # the image and LOG_STACK is set to a single file below. That leaves the
+        # level sweep genuinely exercised on every build, which is most of the
+        # point of running this command inside the image at all.
         run: |
           docker run --rm \
             -e BINARYLANE_API_TOKEN=ci-token-never-used \
