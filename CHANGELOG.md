@@ -6,7 +6,7 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.0] - 2026-09-06
 
 ### Added
 
@@ -19,18 +19,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   runs. Use it when the network is fine but nobody is watching where the messages
   land.
 
-  It is deliberately not `--offline`, which is this fleet's name for suppressing
-  everything that leaves the machine: that would drop the rclone remote probe,
-  and a remote that stopped answering is exactly what a rebuild gate exists to
-  surface. Never the default, and both suppressed checks report as skips rather
-  than vanishing.
+  It is deliberately narrower than `--offline` below, which also ships in this
+  release: an unattended run still wants its outbound probes to run, because a
+  backup remote that stopped answering is exactly what a gate nobody is watching
+  exists to surface. Never the default, and both suppressed checks report as
+  skips rather than vanishing.
 
 - **`app:validate --offline`.** The fleet's name for "make no call that leaves
   this machine": it skips the API calls and the rclone remote probe, refuses
   `--download` rather than quietly ignoring it, and implies `--unattended`. Not
-  the reverse — an unattended run still wants its outbound probes to fail loudly,
-  because a backup remote that stopped answering is exactly what an unwatched
-  rebuild gate exists to surface.
+  the reverse — that asymmetry is why there are two flags rather than one.
+  Everything either flag suppresses is reported as a skip naming the flag
+  responsible, so a run never looks like it checked something it did not.
 
   `--no-api` is unchanged and is **not** deprecated. It covers one of the four
   things here that reach outside, so renaming it would have been a silent
@@ -318,7 +318,8 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.2.0...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.3.0...HEAD
+[2.3.0]: https://github.com/hampel/blbackup/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/hampel/blbackup/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/hampel/blbackup/compare/2.1.0...2.1.1
 [2.1.0]: https://github.com/hampel/blbackup/compare/2.0.0...2.1.0
