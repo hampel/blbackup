@@ -25,6 +25,19 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   surface. Never the default, and both suppressed checks report as skips rather
   than vanishing.
 
+- **`app:validate --offline`.** The fleet's name for "make no call that leaves
+  this machine": it skips the API calls and the rclone remote probe, refuses
+  `--download` rather than quietly ignoring it, and implies `--unattended`. Not
+  the reverse — an unattended run still wants its outbound probes to fail loudly,
+  because a backup remote that stopped answering is exactly what an unwatched
+  rebuild gate exists to surface.
+
+  `--no-api` is unchanged and is **not** deprecated. It covers one of the four
+  things here that reach outside, so renaming it would have been a silent
+  widening under a name people already script rather than a rename — and it has a
+  use `--offline` cannot serve, which is CI running this command inside the
+  freshly built image with no credentials but with the log sweep really written.
+
 - **An attended run now says what it posted.** `posted 4 records at error and
   above: error, critical, alert, emergency — check they arrived`, derived from
   the effective log stack and that channel's threshold. Sending was previously

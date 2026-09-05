@@ -79,12 +79,16 @@ jobs:
         # and writes a real log record at every level. The token is only checked
         # for presence, never used.
         #
-        # Deliberately NOT --unattended, and deliberately not relying on --no-api
-        # to keep it off Slack either, which it has never done. Nothing is posted
-        # here because no webhook is configured: .dockerignore keeps .env out of
-        # the image and LOG_STACK is set to a single file below. That leaves the
-        # level sweep genuinely exercised on every build, which is most of the
-        # point of running this command inside the image at all.
+        # Deliberately --no-api rather than --offline, and deliberately not
+        # --unattended. Both of those suppress the level sweep, and this job is
+        # the only place it is ever written inside the image - which is most of
+        # the point of running the command in there at all. Nothing is posted
+        # because no webhook is configured: .dockerignore keeps .env out of the
+        # image and LOG_STACK is a single file below. --no-api has never been
+        # what kept this off Slack, whatever its old comment here claimed.
+        #
+        # This is why --no-api survives as its own flag rather than being renamed
+        # into --offline: it is the one combination --offline cannot express.
         run: |
           docker run --rm \
             -e BINARYLANE_API_TOKEN=ci-token-never-used \

@@ -25,8 +25,9 @@ class AppValidate extends BaseCommand
      * @var string
      */
     protected $signature = 'app:validate
-                            {--no-api : skip the checks that call the BinaryLane API}
+                            {--offline : make no call that leaves this machine, and send nothing}
                             {--unattended : do not send the messages whose only proof is a person seeing them arrive}
+                            {--no-api : skip the checks that call the BinaryLane API, and nothing else}
                             {--d|download= : download this URL to the download path, to exercise the transfer end to end}';
 
     /**
@@ -43,6 +44,45 @@ class AppValidate extends BaseCommand
      * to write to it again.
      */
     protected bool $loggingStopped = false;
+
+    /**
+     * Whether this run may reach the network at all.
+     *
+     * --offline states a fact about the machine - there is no outbound network,
+     * or you are not spending it on this - so nothing here may make a call that
+     * could hang: not the API, not the rclone remote, not a transfer, and not
+     * the messages this command sends.
+     */
+    protected function isOffline() : bool
+    {
+        return (bool) $this->option('offline');
+    }
+
+    /**
+     * Whether anybody is watching where this run's messages land.
+     *
+     * --offline implies this and not the reverse, which is the whole reason
+     * there are two flags. An unattended run still wants its outbound probes to
+     * fail loudly - a backup remote that stopped answering is exactly what a
+     * rebuild gate exists to surface - while wanting nothing posted into a
+     * channel nobody asked to read.
+     */
+    protected function isUnattended() : bool
+    {
+        return $this->isOffline() || (bool) $this->option('unattended');
+    }
+
+    /**
+     * Which flag a skip should name, rather than a boolean.
+     *
+     * The two are different instructions and the operator gave one of them; a
+     * skip that names the wrong one sends somebody looking for a flag they did
+     * not pass.
+     */
+    protected function quietedBy() : string
+    {
+        return $this->isOffline() ? '--offline' : '--unattended';
+    }
 
     /**
      * Execute the console command.
@@ -223,8 +263,9 @@ class AppValidate extends BaseCommand
      * Records are written at every level on every attended run: a destination
      * with a threshold - Slack at critical - only proves it works when something
      * at that level is actually sent, and a webhook that has been revoked says
-     * nothing about it at this end. The run posts. --unattended is the only way
-     * to stop it, and states that nobody is watching where they would land.
+     * nothing about it at this end. The run posts. --unattended stops it, and
+     * states that nobody is watching where the records would land; --offline
+     * stops it too, by implying that flag.
      */
     protected function checkLogging() : void
     {
@@ -313,9 +354,12 @@ class AppValidate extends BaseCommand
      * Write a record at every level, and say so - the console cannot know what
      * arrived at the other end, only that it was sent.
      *
-     * Skipped under --unattended, which is the one condition that makes the
-     * sweep not worth its cost: the records prove the webhook and the threshold
-     * by arriving, and nothing is proved by arriving where nobody is looking.
+     * Skipped under --unattended, which is the condition that makes the sweep
+     * not worth its cost: the records prove the webhook and the threshold by
+     * arriving, and nothing is proved by arriving where nobody is looking.
+     * --offline skips it too, and has to - the stack may hold a channel that
+     * posts, and which channels those are is not answerable from configuration
+     * (driver => monolog could be papertrail), so the safe answer is none.
      * Never the default, though - forgetting the flag costs some channel noise
      * that can be deleted, while defaulting it on would cost every future run
      * its proof of delivery, silently, which cannot be undone by noticing.
@@ -331,9 +375,9 @@ class AppValidate extends BaseCommand
             return;
         }
 
-        if ($this->option('unattended'))
+        if ($this->isUnattended())
         {
-            $this->reportSkip('log records', 'nothing was written - --unattended');
+            $this->reportSkip('log records', 'nothing was written - ' . $this->quietedBy());
 
             $this->checkDelivery($levels);
 
@@ -407,9 +451,9 @@ class AppValidate extends BaseCommand
                 continue;
             }
 
-            if ($this->option('unattended'))
+            if ($this->isUnattended())
             {
-                $this->reportSkip("log delivery ({$name})", 'nothing was posted - --unattended');
+                $this->reportSkip("log delivery ({$name})", 'nothing was posted - ' . $this->quietedBy());
 
                 continue;
             }
@@ -461,9 +505,9 @@ class AppValidate extends BaseCommand
         // the same reasoning as the log sweep: this webhook is proved by the
         // message arriving, so there is nothing to prove by spending one on a
         // channel nobody has been asked to read
-        if ($this->option('unattended'))
+        if ($this->isUnattended())
         {
-            $this->reportSkip('run summary', 'configured, but nothing was sent - --unattended');
+            $this->reportSkip('run summary', 'configured, but nothing was sent - ' . $this->quietedBy());
 
             return;
         }
@@ -554,6 +598,17 @@ class AppValidate extends BaseCommand
             return;
         }
 
+        // the probe --unattended deliberately leaves running: a remote that has
+        // stopped answering is exactly what an unwatched rebuild gate is for.
+        // Only --offline, which says the network is not there to be asked, takes
+        // it out - and it has to, because this is the call that hangs
+        if ($this->isOffline())
+        {
+            $this->reportSkip("rclone remote", "{$remote} was not probed - --offline");
+
+            return;
+        }
+
         // the one probe here that crosses a network, and the only one that can
         // take longer than the process timeout - which threw a stack trace out
         // of the command whose whole job is to report a failure legibly
@@ -589,9 +644,11 @@ class AppValidate extends BaseCommand
 
         $this->reportOk("API token", "set");
 
-        if ($this->option('no-api'))
+        // the token itself is checked above either way: whether it is present is
+        // a fact about this installation and costs nothing to establish
+        if ($this->isOffline() || $this->option('no-api'))
         {
-            $this->reportSkip("BinaryLane account", "skipped with --no-api");
+            $this->reportSkip("BinaryLane account", 'skipped with ' . ($this->isOffline() ? '--offline' : '--no-api'));
 
             return;
         }
@@ -636,10 +693,10 @@ class AppValidate extends BaseCommand
      * things being checked is whether the log destination can be written at
      * all, and Monolog throws when it cannot.
      *
-     * Deliberately not suppressed by --unattended, although these records can
-     * reach the same Slack channel the sweep does. A warning or a failure is the
+     * Deliberately not suppressed by --unattended or --offline, although these
+     * records can reach the same Slack channel the sweep does. A warning or a failure is the
      * half of this command's output written for whoever is not at the terminal,
-     * and --unattended states that nobody is - which makes it the run where the
+     * and both flags state that nobody is - which makes those the runs where the
      * record matters most, not least. The flag is about sends whose only value
      * is a person seeing them arrive; this one has value sitting in the log.
      */
@@ -670,6 +727,17 @@ class AppValidate extends BaseCommand
         if (empty($url))
         {
             $this->reportSkip("Download transfer", "not exercised - pass --download=<url> to try a real transfer");
+
+            return;
+        }
+
+        // the two contradict, and --offline is the one that states a fact about
+        // the machine rather than a wish about this run, so it wins. Reported
+        // rather than ignored: somebody asked for a transfer and is owed the
+        // reason they did not get one
+        if ($this->isOffline())
+        {
+            $this->reportSkip("Download transfer", "not exercised - --offline, which --download cannot override");
 
             return;
         }

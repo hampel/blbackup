@@ -581,3 +581,81 @@ it('does not guess when the threshold is not a log level', function () {
         ->and($output)->toContain('[warn] log delivery (slack)')
         ->toContain('[loud] is not a log level');
 });
+
+it('makes no call that leaves the machine with --offline', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    $sent = [];
+    recordingSlack($sent);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
+    app()->forgetInstance(App\Support\SlackSummary::class);
+
+    Log::spy();
+
+    [$exit, $output] = validate(['--offline' => true, '--download' => 'https://images.binarylane.com.au/probe.zst']);
+
+    expect($exit)->toBe(0)
+        ->and($sent)->toBe([])
+        ->and($output)->toContain('[    ] rclone remote')
+        ->toContain('[    ] BinaryLane account')
+        ->toContain('skipped with --offline')
+        ->toContain('[    ] Download transfer')
+        ->toContain('--download cannot override')
+        ->toContain('[    ] log records')
+        ->toContain('[    ] run summary');
+
+    // the token is a fact about the installation and still worth establishing
+    expect($output)->toContain('[ ok ] API token');
+
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' lsd '));
+    Http::assertNothingSent();
+});
+
+it('names the flag the operator actually passed', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    Log::spy();
+
+    [, $offline] = validate(['--offline' => true]);
+    [, $unattended] = validate(['--unattended' => true]);
+
+    expect($offline)->toContain('nothing was written - --offline')
+        ->and($unattended)->toContain('nothing was written - --unattended');
+});
+
+it('still probes the remote when only nobody is watching', function () {
+    // --unattended says the network is fine, so a remote that has stopped
+    // answering is exactly what it should still surface. This asymmetry is the
+    // whole reason there are two flags rather than one
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate(['--unattended' => true]);
+
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] rclone remote');
+
+    Process::assertRan(fn ($process) => str_contains($process->command, ' lsd '));
+});
+
+it('leaves everything but the api alone with --no-api', function () {
+    // what CI runs inside the image: no credentials, but the level sweep really
+    // written and the binaries really run. --no-api must not creep into meaning
+    // --offline, or that check quietly stops happening
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    Log::spy();
+
+    [$exit, $output] = validate(['--no-api' => true]);
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('skipped with --no-api')
+        ->toContain('[ ok ] log records')
+        ->toContain('[ ok ] rclone remote');
+
+    foreach (['debug', 'error', 'emergency'] as $level)
+    {
+        Log::shouldHaveReceived('log')->with($level, "Validation test message [{$level}]");
+    }
+});

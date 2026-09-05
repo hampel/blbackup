@@ -358,11 +358,7 @@ noticed.
 
 **`--unattended` suppresses exactly those two and nothing else**, and states a
 condition rather than a preference: the network is fine, but nobody is watching
-where these land. It is deliberately not `--offline`, which is the fleet's name
-for suppressing everything that leaves the machine — that would drop the rclone
-remote probe and the API calls too, and a remote that stopped answering is
-exactly what a rebuild gate exists to surface. `--offline` would imply
-`--unattended`; not the reverse. Three things follow that are worth not undoing:
+where these land. Three things follow that are worth not undoing:
 
 - **It is never the default.** Forgetting it costs channel noise somebody can
   delete; defaulting it on would cost every future run its proof of delivery,
@@ -372,6 +368,37 @@ exactly what a rebuild gate exists to surface. `--offline` would imply
 - **A warning or a failure is still logged**, even though those records reach
   the same channel. That half of the output is written for whoever is *not* at
   the terminal, which is precisely who `--unattended` says is running it.
+
+**Three flags, and they are not interchangeable.** Each states a different
+condition, and the wrong one either throws away a check or hangs on a call that
+was never going to answer:
+
+| flag | the condition it states | what it suppresses |
+|---|---|---|
+| `--offline` | there is no outbound network, or you are not spending it | everything that leaves the machine |
+| `--unattended` | the network is fine, nobody is watching the destination | only the two sends |
+| `--no-api` | the API calls are not worth their cost on this run | the account and server calls, and nothing else |
+
+**`--offline` implies `--unattended`, and not the reverse.** That asymmetry is
+the whole reason there is more than one: an unattended run still wants its
+outbound probes to fail loudly — a backup remote that stopped answering is
+exactly what an unwatched rebuild gate exists to surface — while wanting nothing
+posted into a channel nobody asked to read. `--offline` additionally skips the
+rclone remote probe, skips the API calls, and refuses `--download` rather than
+silently ignoring it.
+
+**`--no-api` was not renamed into `--offline`, and it is not deprecated.** The
+fleet settled `--offline` as the house name, and the obvious tidy-up is to make
+this tool's older, narrower flag mean it. It cannot: `--no-api` covers one of
+the four things here that reach outside, so renaming it would be a silent
+widening under a name people already script rather than a rename. It also has a
+permanent user that `--offline` cannot serve — the CI job runs `app:validate`
+inside the freshly built image with no credentials, and needs the API off while
+needing the level sweep genuinely written, which is most of the point of running
+the command in there at all. `--offline` cannot give it that, because it must
+assume any log channel might post: `driver => monolog` could be papertrail, so
+"is this stack local?" is not answerable from configuration, and the safe answer
+is to send nothing.
 
 **An attended run has to say what it sent**, because the operator cannot check
 what they were not told to expect. `checkDelivery()` prints the count and the

@@ -160,7 +160,7 @@ blbackup move     <file>|--all [--remote=REMOTE] [--dry-run]
 blbackup clean    [--days=N] [--remote] [--dry-run]
 
 blbackup app:config   [--only=SECTION]
-blbackup app:validate [--no-api] [--unattended] [-d|--download=URL]
+blbackup app:validate [--offline] [--unattended] [--no-api] [-d|--download=URL]
 ```
 
 `--include` and `--exclude` each take a path to a plain-text file, one hostname
@@ -299,7 +299,6 @@ and a non-zero exit if anything failed, so a container rebuild can be gated on
 it.
 
 `--download=<url>` additionally pulls a real URL through the download path.
-`--no-api` skips the calls that cost an API request.
 
 **It really posts to Slack**, which is the point: a destination with a threshold
 only proves it works when something at that level is really sent, and a revoked
@@ -315,17 +314,30 @@ emergency` — so the count can be compared against the channel. Four records at
 threshold of `error` is right; three means the threshold is not what the
 configuration says.
 
-**`--unattended` suppresses both**, and nothing else — every binary, path, lock,
-remote and API call still runs, and the two sends are reported as skips rather
-than quietly left out. Use it when the network is fine but nobody is watching
-where the messages land: a scripted rebuild, a smoke test in a pipeline, a
-`for host in …` loop. It is not a quiet mode and it is not the default, because
-forgetting it costs some noise you can delete, while having it on by default
-would cost every run its proof of delivery without saying so.
+### Three flags for three different conditions
 
-A warning or a failure is still written to the log under `--unattended`. That is
-the half of this command's output meant for whoever is not at the terminal, and
-`--unattended` is the run where that is everybody.
+| flag | say this when | it stops |
+|---|---|---|
+| `--offline` | there is no outbound network, or you are not spending it | every call that leaves the machine |
+| `--unattended` | the network is fine, but nobody is watching the destination | only the two messages above |
+| `--no-api` | the API calls are not worth their cost this run | the account and server calls, nothing else |
+
+**`--offline` implies `--unattended`; not the reverse.** That is the point of
+having both. An unattended run still wants its outbound probes to fail loudly —
+a backup remote that stopped answering is exactly what an unwatched rebuild gate
+is for — while wanting nothing posted into a channel nobody asked to read.
+`--offline` also skips the rclone remote probe and the API calls, and refuses
+`--download` rather than quietly ignoring it.
+
+None of them is a quiet mode and none is the default. Everything they suppress
+is reported as a skip, naming the flag responsible, so a run never looks like it
+checked something it did not. Forgetting one costs some noise you can delete;
+having one on by default would cost every run its proof of delivery without
+saying so.
+
+A warning or a failure is still written to the log under all three. That is the
+half of this command's output meant for whoever is not at the terminal, and
+these flags are the runs where that is everybody.
 
 Do not try to get the same effect by blanking a webhook on the command line.
 `.env` is loaded mutably, so `BLBACKUP_SUMMARY_SLACK_WEBHOOK= blbackup
@@ -345,7 +357,8 @@ with `app:validate --no-api` run inside it**, and a compiled binary. The middle
 one is there because the `Dockerfile` had never been built anywhere but the
 production server, so its first execution was always on the machine taking the
 backups — and two defects reached it that way. `--no-api` needs no credentials
-and still exercises every binary, path and dependency.
+and still exercises every binary, path and dependency — including really writing
+the log records, which is why that job uses it rather than `--offline`.
 
 The suite fakes at the process, HTTP client and filesystem boundaries and
 asserts on what the commands actually produce — the exact shell command string,
