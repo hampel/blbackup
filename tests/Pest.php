@@ -61,6 +61,15 @@ uses(Tests\TestCase::class)
             // how many records a threshold posts has to be reading the threshold
             // this project ships, not the one in the .env beside the suite
             'logging.channels.slack.level' => 'critical',
+
+            // config/app.php resolves this by shelling out to `git describe
+            // --tags`, so without a pin every test inherits whatever the ambient
+            // checkout can answer. A clone with no tags - CI on a branch push,
+            // or a --depth 1 clone - answers "unreleased", app:validate warns
+            // about it, and tests that assert a clean run fail somewhere with
+            // nothing to do with the version. The two tests that care about it
+            // set it themselves
+            'app.version' => '0.0.0-testing',
         ]);
 
         // repoints the downloads disk at storage/framework/testing and empties

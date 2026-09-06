@@ -459,8 +459,27 @@ chasing: deleting `create`'s `errored` status check changes nothing, because the
 `!== 'in-progress'` check below it catches the same case, and the download
 timeout cannot be observed through `Http::fake()`, which never times out.
 
-Eight things that will catch you out:
+Ten things that will catch you out:
 
+- **Anything the suite does not pin, it inherits — and two of those left the
+  machine.** `tests/Pest.php` pins the binaries, the remote, the timezone, the
+  token and the log channel because the project `.env` is loaded during tests.
+  The pins that were missing were the two that sent: a full run posted 41 real
+  messages to `BLBACKUP_SUMMARY_SLACK_WEBHOOK`, because `SlackSummary` is a
+  container singleton built from config with a **real Guzzle client** that
+  `Http::fake()` cannot see; and the level sweep posted through Monolog's slack
+  handler, which `Http::fake()` cannot see either. When adding anything that
+  sends, pin it here and write the test that fails if somebody unpins it —
+  `recordingSlack()` is there for that.
+- **`app.version` is pinned for the same reason, and the reason is `git`.**
+  `config/app.php` resolves it by shelling out to `git describe --tags`, so
+  without a pin every test inherits whatever the ambient checkout can answer. A
+  clone with no tags answers `unreleased`, `app:validate` warns about it, and a
+  test asserting a clean run fails somewhere with nothing to do with versions.
+  That is not hypothetical: **CI's branch builds were red from 2.2.0 to 2.3.0**
+  and nobody noticed, because `actions/checkout` fetches the tag on a tag push
+  and no tags on a branch push — so the tag run, which is the one being watched
+  at release time, passed every time. **Look at the branch run too.**
 - **`beforeEach()` in `tests/Pest.php` must be chained onto `uses()`** —
   `beforeEach(...)->in('Feature')` on its own parses fine and silently never
   runs, so the tests execute against the developer's real config.
