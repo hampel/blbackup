@@ -6,6 +6,38 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`LOG_SLACK_LEVEL` now defaults to `error` rather than `critical`.** Nothing
+  in this application logs above `error` — verified across every call site — so
+  the stock Laravel default meant a configured Slack log channel accepted a valid
+  webhook, passed every check in `app:validate`, received that command's own test
+  sweep, and then never fired again. A channel that cannot fire looks exactly
+  like a channel with nothing to report, which is the failure worth catching.
+
+  **This is a behaviour change for an install that never set the variable**: a
+  channel that has been silent will start receiving `error` records, which is
+  what configuring it asked for. Set `LOG_SLACK_LEVEL` explicitly to keep the old
+  threshold.
+
+### Added
+
+- **`app:validate` warns when the Slack threshold is above anything this tool
+  logs at**, naming the level to set. Changing a default only ever reaches
+  installs that never set the variable, so the warning is the half that reaches
+  the ones that did. A warning rather than a failure, because this command's exit
+  code gates a container rebuild. Reported even under `--unattended` and
+  `--offline`, unlike the two sends: a threshold is a static fact about the
+  configuration rather than something the sweep discovers, so the run that posts
+  nothing is exactly the run that should surface it.
+
+- **The delivery count includes the run summary when both webhooks point at the
+  same channel.** They are separate settings, but pointing both at one is the
+  obvious thing to do — and then one more message arrived than the line
+  predicted, which makes a correct count look wrong.
+
 ## [2.3.0] - 2026-09-06
 
 ### Added

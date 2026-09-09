@@ -40,6 +40,17 @@ class AppValidate extends BaseCommand
     protected string $commandContext = 'validate';
 
     /**
+     * The highest level anything in this application logs at.
+     *
+     * A claim about the whole of app/ rather than a setting, and the slack
+     * threshold check below is only worth as much as the claim is true. It will
+     * stop being true the first time somebody adds a critical call, and nothing
+     * else in the suite would notice - so tests/Feature/LogLevelTest.php scans
+     * for exactly that and fails when this needs raising.
+     */
+    protected const HIGHEST_LOGGED_LEVEL = 'error';
+
+    /**
      * Set once the log destination is known to be unwritable, so nothing tries
      * to write to it again.
      */
@@ -261,9 +272,9 @@ class AppValidate extends BaseCommand
      * The same shape as wback's, so the two tools report their logging alike.
      *
      * Records are written at every level on every attended run: a destination
-     * with a threshold - Slack at critical - only proves it works when something
-     * at that level is actually sent, and a webhook that has been revoked says
-     * nothing about it at this end. The run posts. --unattended stops it, and
+     * with a threshold only proves it works when something at that level is
+     * actually sent, and a webhook that has been revoked says nothing about it
+     * at this end. The run posts. --unattended stops it, and
      * states that nobody is watching where the records would land; --offline
      * stops it too, by implying that flag.
      */
@@ -451,13 +462,6 @@ class AppValidate extends BaseCommand
                 continue;
             }
 
-            if ($this->isUnattended())
-            {
-                $this->reportSkip("log delivery ({$name})", 'nothing was posted - ' . $this->quietedBy());
-
-                continue;
-            }
-
             $threshold = config("logging.channels.{$name}.level");
             $index = array_search(strtolower((string) $threshold), $levels, true);
 
@@ -469,16 +473,75 @@ class AppValidate extends BaseCommand
                 continue;
             }
 
+            // before the flag check below, deliberately: this one is reported on
+            // a run that posts nothing, and the docblock says why
+            $this->checkThreshold($name, (string) $threshold, $index, $levels);
+
+            if ($this->isUnattended())
+            {
+                $this->reportSkip("log delivery ({$name})", 'nothing was posted - ' . $this->quietedBy());
+
+                continue;
+            }
+
             $posted = array_slice($levels, $index);
 
+            // the run summary usually points at the same channel, and when it
+            // does, one more message arrives than the sweep sent - which turns a
+            // correct count into one that does not match what the operator sees
+            $summary = (string) config('binarylane.summary.slack_webhook');
+            $shared = $summary !== '' && $summary === config("logging.channels.{$name}.url");
+
             $this->reportOk("log delivery ({$name})", sprintf(
-                'posted %d %s at %s and above: %s - check they arrived',
+                'posted %d %s at %s and above: %s%s',
                 count($posted),
                 count($posted) === 1 ? 'record' : 'records',
                 $threshold,
-                implode(', ', $posted)
+                implode(', ', $posted),
+                $shared
+                    ? ' - and the run summary on this webhook, so expect ' . (count($posted) + 1)
+                    : ' - check they arrived'
             ));
         }
+    }
+
+    /**
+     * A slack channel set above anything this application logs at.
+     *
+     * The failure this catches is the quiet kind. The webhook is valid, every
+     * check passes, the sweep really posts - and then nothing arrives on the
+     * night it was installed for, because no call site in app/ ever reaches the
+     * threshold. A channel that cannot fire is indistinguishable from a channel
+     * with nothing to say, which is the whole reason it was configured.
+     *
+     * A warning rather than a failure: this command's exit code gates a
+     * container rebuild, and an install that set the threshold high on purpose
+     * should not thereby be unable to rebuild.
+     *
+     * Reported even under --unattended and --offline, unlike the sends. A
+     * threshold is a static fact about the configuration rather than something
+     * the sweep discovers, so the run that posts nothing is exactly the run that
+     * should still surface it.
+     *
+     * @param int $index where the threshold sits in $levels, lowest first
+     * @param array<int, string> $levels every level, lowest first
+     */
+    protected function checkThreshold(string $name, string $threshold, int $index, array $levels) : void
+    {
+        $highest = array_search(self::HIGHEST_LOGGED_LEVEL, $levels, true);
+
+        if ($index <= $highest)
+        {
+            return;
+        }
+
+        $this->reportWarn("log threshold ({$name})", sprintf(
+            '%s is above %s, the highest level anything here logs at - the channel '
+                . "can only ever catch this command's own sweep - set LOG_SLACK_LEVEL=%s",
+            $threshold,
+            self::HIGHEST_LOGGED_LEVEL,
+            self::HIGHEST_LOGGED_LEVEL
+        ));
     }
 
     /**

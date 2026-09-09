@@ -104,7 +104,14 @@ return [
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
             'username' => env('LOG_SLACK_USERNAME', $hostname ?: 'blbackup'),
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
-            'level' => env('LOG_SLACK_LEVEL', 'critical'),
+            // `error`, not Laravel's stock `critical`, because nothing in this
+            // application logs above `error` - the highest level any call site
+            // uses. Left at `critical` the channel passes every check and then
+            // stays silent on the night it was installed for, which is worse
+            // than a noisy one: it cannot be told from a quiet night.
+            // app:validate warns if this is set above what anything logs at,
+            // and AppValidate::HIGHEST_LOGGED_LEVEL is what it compares against.
+            'level' => env('LOG_SLACK_LEVEL', 'error'),
             'replace_placeholders' => true,
             'tap' => [StampHostname::class],
         ],

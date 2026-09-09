@@ -659,3 +659,107 @@ it('leaves everything but the api alone with --no-api', function () {
         Log::shouldHaveReceived('log')->with($level, "Validation test message [{$level}]");
     }
 });
+
+/**
+ * A stack with one slack channel in it, at the given threshold.
+ */
+function slackStack(string $level, string $url = 'https://hooks.slack.com/services/A/B/C'): void
+{
+    config([
+        'logging.default' => 'stack',
+        'logging.channels.stack.channels' => ['slack'],
+        'logging.channels.slack.url' => $url,
+        'logging.channels.slack.level' => $level,
+    ]);
+
+    Log::spy();
+}
+
+it('warns when the slack threshold is above anything this app logs at', function () {
+    // the quiet failure: the webhook is valid, every check passes, and then
+    // nothing arrives on the night it was installed for
+    fakeApi([fakeServer()]);
+    slackStack('critical');
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] log threshold (slack)')
+        ->toContain('critical is above error')
+        ->toContain('set LOG_SLACK_LEVEL=error')
+        // a warning, not a failure - this exit code gates a container rebuild
+        ->toContain('Checks passed, with warnings');
+});
+
+it('says nothing about the threshold at the level that ships', function () {
+    fakeApi([fakeServer()]);
+    slackStack('error');
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->not->toContain('log threshold');
+});
+
+it('says nothing about the threshold below that level either', function () {
+    fakeApi([fakeServer()]);
+    slackStack('warning');
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->not->toContain('log threshold');
+});
+
+it('warns about the threshold even when it is sending nothing', function () {
+    // the asymmetry with the two sends: a threshold is a static fact about the
+    // configuration rather than something the sweep discovers, so the run that
+    // posts nothing is exactly the run that should still surface it
+    fakeApi([fakeServer()]);
+    slackStack('emergency');
+
+    foreach ([['--unattended' => true], ['--offline' => true]] as $flags)
+    {
+        [, $output] = validate($flags);
+
+        expect($output)->toContain('[warn] log threshold (slack)')
+            ->toContain('emergency is above error')
+            ->toContain('nothing was posted -');
+    }
+});
+
+it('counts the run summary in when it shares the log webhook', function () {
+    // they are separate settings and usually separate channels, but pointing
+    // both at one is the obvious thing to do - and then one more message
+    // arrives than the sweep sent, which makes a correct count look wrong
+    fakeApi([fakeServer()]);
+    slackStack('error', 'https://hooks.slack.com/services/SHARED');
+
+    $sent = [];
+    recordingSlack($sent);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.com/services/SHARED']);
+    app()->forgetInstance(App\Support\SlackSummary::class);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('posted 4 records at error and above')
+        ->toContain('and the run summary on this webhook, so expect 5')
+        ->not->toContain('check they arrived');
+
+    expect($sent)->toHaveCount(1);
+});
+
+it('does not count it in when the two point somewhere different', function () {
+    fakeApi([fakeServer()]);
+    slackStack('error', 'https://hooks.slack.com/services/LOGS');
+
+    $sent = [];
+    recordingSlack($sent);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.com/services/SUMMARY']);
+    app()->forgetInstance(App\Support\SlackSummary::class);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('check they arrived')
+        ->not->toContain('so expect');
+});

@@ -266,9 +266,10 @@ locked.
 Two mechanisms, deliberately complementary:
 
 **The log channels** record what happened, and can post to Slack at a threshold
-— `LOG_SLACK_LEVEL=critical` and above, say. A log channel can only ever report
-trouble, so a night where everything worked produces nothing at all, which looks
-exactly like a cron entry nobody installed.
+— `LOG_SLACK_LEVEL=error` and above, which is the default and is as high as it
+can usefully go, since nothing here logs above `error`. A log channel can only
+ever report trouble, so a night where everything worked produces nothing at all,
+which looks exactly like a cron entry nobody installed.
 
 **The run summary** is one message per run saying what it did — servers backed
 up, bytes downloaded, files moved, files expired, how long it took, and what
@@ -312,7 +313,16 @@ It sends two things. The record it writes at every log level goes wherever
 posted — `posted 4 records at error and above: error, critical, alert,
 emergency` — so the count can be compared against the channel. Four records at a
 threshold of `error` is right; three means the threshold is not what the
-configuration says.
+configuration says. If both webhooks point at the same channel, the line says so
+and adds one, because the summary lands there too.
+
+**It also warns when `LOG_SLACK_LEVEL` is set above anything this tool logs at.**
+Nothing here logs above `error`, so a channel set to `critical` accepts a valid
+webhook, passes every check, receives this command's own test sweep, and then
+never fires again — which is indistinguishable from a channel with nothing to
+report. `error` is the default for that reason. A warning rather than a failure,
+so an install that set it high deliberately can still gate a rebuild on this
+command.
 
 ### Three flags for three different conditions
 

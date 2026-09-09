@@ -368,6 +368,10 @@ where these land. Three things follow that are worth not undoing:
 - **A warning or a failure is still logged**, even though those records reach
   the same channel. That half of the output is written for whoever is *not* at
   the terminal, which is precisely who `--unattended` says is running it.
+- **The slack threshold check still reports**, for the same reason turned
+  around: it is a static fact about the configuration rather than something the
+  sweep discovers, so the run that posts nothing is exactly the run that should
+  still surface it.
 
 **Three flags, and they are not interchangeable.** Each states a different
 condition, and the wrong one either throws away a check or hangs on a call that
@@ -409,8 +413,33 @@ drift from the configuration it describes. Note the driver test in there says
 `driver => monolog` and leaves the machine just as surely, so gating the loop on
 the driver would send all eight off the box rather than none.
 
+**A slack channel can be configured so that it cannot fire, and that is the
+failure worth catching.** `LOG_SLACK_LEVEL` used to default to Laravel's stock
+`critical`, and **nothing in `app/` logs above `error`** — so out of the box the
+channel accepted a valid webhook, passed every check, posted `app:validate`'s own
+sweep, and then stayed silent on the night it was installed for. A channel that
+cannot fire is indistinguishable from one with nothing to say, which is the whole
+reason it was configured. The default is now `error`, and `checkThreshold()`
+warns when the threshold is above `AppValidate::HIGHEST_LOGGED_LEVEL`.
+
+Two things about that constant. It **warns rather than fails**, because this
+command's exit code gates a container rebuild and an install that set the
+threshold high on purpose should not thereby be unable to rebuild. And it is **a
+claim about the whole of `app/`, not a setting** — it goes stale the moment
+somebody adds a `critical` call, and nothing else would notice, so
+`tests/Feature/LogLevelTest.php` scans the token stream for anything above it.
+Changing the default only ever helps an install that never set the variable; the
+warning is the half that reaches the ones that did.
+
+**The delivery count includes the run summary when the two share a webhook.**
+`BLBACKUP_SUMMARY_SLACK_WEBHOOK` and `LOG_SLACK_WEBHOOK_URL` are separate
+settings and usually separate channels, but pointing both at one is the obvious
+thing to do — and then one more message arrives than the sweep sent, which makes
+a correct count look wrong and trains the operator to ignore the line.
+
 The pattern, and the argument for each of those decisions, is written up at
-`/srv/www/validate-and-config.html`; `wback` is the reference implementation.
+`/srv/www/validate-and-config.html`; `wback` is the reference implementation, and
+found this one.
 
 `config/logging.php` stamps every record with `logging.hostname` through the
 `StampHostname` tap, so one webhook can serve more than one installation. It has
@@ -459,7 +488,7 @@ chasing: deleting `create`'s `errored` status check changes nothing, because the
 `!== 'in-progress'` check below it catches the same case, and the download
 timeout cannot be observed through `Http::fake()`, which never times out.
 
-Ten things that will catch you out:
+Eleven things that will catch you out:
 
 - **Anything the suite does not pin, it inherits — and two of those left the
   machine.** `tests/Pest.php` pins the binaries, the remote, the timezone, the
@@ -471,6 +500,15 @@ Ten things that will catch you out:
   handler, which `Http::fake()` cannot see either. When adding anything that
   sends, pin it here and write the test that fails if somebody unpins it —
   `recordingSlack()` is there for that.
+- **`tests/Feature/LogLevelTest.php` guards a claim, not a behaviour.**
+  `AppValidate::HIGHEST_LOGGED_LEVEL` asserts something about every other file
+  in `app/`, so the test walks the token stream rather than grepping. Two things
+  it gets right that a regex does not: the level usually sits on the **line
+  after** `$this->log(` — there are 40 such call sites, and a per-line pattern
+  finds almost none of them — and `$this->alert('…')` is Laravel's console
+  banner, not a log call, so only `Log::<level>()` counts as a static call. It
+  also asserts the scanner found something, because a scan that silently matches
+  nothing passes forever.
 - **`app.version` is pinned for the same reason, and the reason is `git`.**
   `config/app.php` resolves it by shelling out to `git describe --tags`, so
   without a pin every test inherits whatever the ambient checkout can answer. A

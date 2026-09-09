@@ -59,8 +59,11 @@ uses(Tests\TestCase::class)
 
             // the shipped default rather than the developer's: a test that says
             // how many records a threshold posts has to be reading the threshold
-            // this project ships, not the one in the .env beside the suite
-            'logging.channels.slack.level' => 'critical',
+            // this project ships, not the one in the .env beside the suite. Keep
+            // this in step with config/logging.php - LogLevelTest asserts they
+            // agree, because a pin that drifts from the default silently stops
+            // testing the shipped configuration
+            'logging.channels.slack.level' => 'error',
 
             // config/app.php resolves this by shelling out to `git describe
             // --tags`, so without a pin every test inherits whatever the ambient
