@@ -371,7 +371,8 @@ where these land. Three things follow that are worth not undoing:
 - **The slack threshold check still reports**, for the same reason turned
   around: it is a static fact about the configuration rather than something the
   sweep discovers, so the run that posts nothing is exactly the run that should
-  still surface it.
+  still surface it. See the ordering rule below — intending that is not the same
+  as getting it.
 
 **Three flags, and they are not interchangeable.** Each states a different
 condition, and the wrong one either throws away a check or hangs on a call that
@@ -431,6 +432,22 @@ somebody adds a `critical` call, and nothing else would notice, so
 Changing the default only ever helps an install that never set the variable; the
 warning is the half that reaches the ones that did.
 
+**A check that survives a flag has to be ordered against it, not merely written
+to survive it.** `checkThreshold()` is meant to report under `--unattended` and
+`--offline`, and did not: the flag's early return sat above the line that
+resolved the threshold, so the warning was unreachable on exactly the runs that
+most need it. The rule, and it generalises past this command:
+
+> When a flag suppresses part of a check, everything that must outlive the flag
+> goes **above** the early return. A suppression flag is a `continue`, and
+> anything below it is suppressed too, whatever the docblock says.
+
+Worth stating because it is the same failure as the one that started this —
+something that reads as configured and cannot fire — and because `wback` hit it
+independently, in its own implementation, and neither of us got the order right
+first time. A mutation that moves the call back below the flag check fails a
+test, so it cannot drift back.
+
 **The delivery count includes the run summary when the two share a webhook.**
 `BLBACKUP_SUMMARY_SLACK_WEBHOOK` and `LOG_SLACK_WEBHOOK_URL` are separate
 settings and usually separate channels, but pointing both at one is the obvious
@@ -488,7 +505,7 @@ chasing: deleting `create`'s `errored` status check changes nothing, because the
 `!== 'in-progress'` check below it catches the same case, and the download
 timeout cannot be observed through `Http::fake()`, which never times out.
 
-Eleven things that will catch you out:
+Twelve things that will catch you out:
 
 - **Anything the suite does not pin, it inherits — and two of those left the
   machine.** `tests/Pest.php` pins the binaries, the remote, the timezone, the
@@ -500,6 +517,12 @@ Eleven things that will catch you out:
   handler, which `Http::fake()` cannot see either. When adding anything that
   sends, pin it here and write the test that fails if somebody unpins it —
   `recordingSlack()` is there for that.
+- **A literal scan cannot see through a variable**, so `LogLevelTest` pins the
+  dynamic call sites separately. Three calls here pass a `$level` through rather
+  than naming one — `BaseCommand::log()`, the sweep, and `AppValidate::record()`
+  — and all three hand on what they were given. A fourth would be a call site the
+  ceiling assertion is blind to, so the test names the three by enclosing
+  function and fails either way: on a new one, and on one of these disappearing.
 - **`tests/Feature/LogLevelTest.php` guards a claim, not a behaviour.**
   `AppValidate::HIGHEST_LOGGED_LEVEL` asserts something about every other file
   in `app/`, so the test walks the token stream rather than grepping. Two things

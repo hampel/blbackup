@@ -136,3 +136,111 @@ it('pins the slack level the suite runs at to the level that ships', function ()
 
     expect(config('logging.channels.slack.level'))->toBe($shipped['channels']['slack']['level']);
 });
+
+/**
+ * Every log()/record() call whose level is a variable rather than a literal,
+ * as [file, line, variable, enclosing function].
+ *
+ * The one hole in the literal scan above, and the reason it is worth a test of
+ * its own: a call site that picks its level at runtime is invisible to
+ * loggingCalls(), so the ceiling assertion would pass while something logged
+ * anywhere it liked. Today every one of these is a pass-through - a helper
+ * handing on whatever it was given - and that is a property worth pinning
+ * rather than re-deriving by hand each time somebody wonders.
+ *
+ * Declarations are skipped: `function log($level, ...)` is the signature, not a
+ * call. Keyed by enclosing function rather than line, so ordinary edits above
+ * it do not churn the expectation.
+ */
+function dynamicLoggingCalls(): array
+{
+    $calls = [];
+
+    $files = new RegexIterator(
+        new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path('app'))),
+        '/\.php$/'
+    );
+
+    foreach ($files as $file)
+    {
+        $path = str_replace(base_path() . '/', '', $file->getPathname());
+        $tokens = token_get_all(file_get_contents($file->getPathname()));
+        $count = count($tokens);
+        $function = '(top level)';
+
+        for ($i = 0; $i < $count; $i++)
+        {
+            if (!is_array($tokens[$i])) continue;
+
+            $skip = function (int $i) use ($tokens, $count) {
+                while ($i < $count && is_array($tokens[$i]) && $tokens[$i][0] === T_WHITESPACE) $i++;
+
+                return $i;
+            };
+
+            if ($tokens[$i][0] === T_FUNCTION)
+            {
+                $named = $skip($i + 1);
+
+                if (is_array($tokens[$named] ?? null) && $tokens[$named][0] === T_STRING)
+                {
+                    $function = $tokens[$named][1];
+
+                    // the signature is not a call, so step past the name
+                    $i = $named;
+                }
+
+                continue;
+            }
+
+            if ($tokens[$i][0] !== T_STRING) continue;
+            if (!in_array($tokens[$i][1], ['log', 'record'], true)) continue;
+
+            $open = $skip($i + 1);
+            if (($tokens[$open] ?? null) !== '(') continue;
+
+            $arg = $skip($open + 1);
+            if (!is_array($tokens[$arg] ?? null)) continue;
+            if ($tokens[$arg][0] === T_CONSTANT_ENCAPSED_STRING) continue;
+
+            $calls[] = [$path, $tokens[$i][2], $tokens[$arg][1], $function];
+        }
+    }
+
+    return $calls;
+}
+
+it('chooses no log level at runtime except to hand one straight on', function () {
+    // Every dynamic level here is a helper passing through what it was given.
+    // A fourth would be a call site the ceiling test cannot see, which is the
+    // one way something could log above HIGHEST_LOGGED_LEVEL unnoticed.
+    $passThroughs = [
+        // BaseCommand::log() dual-writes to Monolog and the console
+        'app/Commands/BaseCommand.php::log',
+        // the sweep, walking its own list of every level
+        'app/Commands/AppValidate.php::writeTestRecords',
+        // AppValidate::record(), which guards every write this command makes
+        'app/Commands/AppValidate.php::record',
+    ];
+
+    $found = dynamicLoggingCalls();
+
+    $unexpected = array_values(array_filter(
+        $found,
+        fn ($c) => !in_array($c[0] . '::' . $c[3], $passThroughs, true)
+    ));
+
+    $report = implode(PHP_EOL, array_map(
+        fn ($c) => "  {$c[0]}:{$c[1]} in {$c[3]}() logs at {$c[2]}",
+        $unexpected
+    ));
+
+    expect($unexpected)->toBe([], 'A log call now picks its level at runtime:'
+        . PHP_EOL . $report . PHP_EOL
+        . 'The ceiling test cannot see through a variable. Either add it to the'
+        . ' pass-through list above, having checked it really does hand on a level'
+        . ' it was given, or give the call a literal.');
+
+    // and the list must not rot the other way, naming sites that have gone
+    expect(count($found))->toBe(count($passThroughs));
+});
