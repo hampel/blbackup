@@ -6,9 +6,18 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.0] - 2026-09-10
 
 ### Changed
+
+- **The application calls itself `blbackup`, not `BinaryLane Backup`.** The name
+  it goes by everywhere else — the binary, the repository, the container — is now
+  the name it reports. You will see it in three places: `--version`, the `Name`
+  row in `app:config`, and the footer of every Slack run summary, which now reads
+  `blbackup 2.4.0 on <host>`. **If anything filters that channel on the old
+  string, it will stop matching.** The Slack log channel's default username
+  follows the same setting, so an install with no `LOG_HOSTNAME` still posts as
+  `blbackup`.
 
 - **`LOG_SLACK_LEVEL` now defaults to `error` rather than `critical`.** Nothing
   in this application logs above `error` — verified across every call site — so
@@ -350,7 +359,8 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.3.0...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.4.0...HEAD
+[2.4.0]: https://github.com/hampel/blbackup/compare/2.3.0...2.4.0
 [2.3.0]: https://github.com/hampel/blbackup/compare/2.2.0...2.3.0
 [2.2.0]: https://github.com/hampel/blbackup/compare/2.1.1...2.2.0
 [2.1.1]: https://github.com/hampel/blbackup/compare/2.1.0...2.1.1
