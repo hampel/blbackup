@@ -102,7 +102,7 @@ return [
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
-            'username' => env('LOG_SLACK_USERNAME', $hostname ?: 'blbackup'),
+            'username' => env('LOG_SLACK_USERNAME', $hostname ?: config('app.name')),
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
             // `error`, not Laravel's stock `critical`, because nothing in this
             // application logs above `error` - the highest level any call site
