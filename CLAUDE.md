@@ -512,7 +512,12 @@ Twelve things that will catch you out:
   `Http::fake()` cannot see; and the level sweep posted through Monolog's slack
   handler, which `Http::fake()` cannot see either. When adding anything that
   sends, pin it here and write the test that fails if somebody unpins it —
-  `recordingSlack()` is there for that.
+  `recordingSlack()` is there for that. **And point every webhook fixture at
+  `hooks.slack.test`**, never the real host: the Slack log channel has no seam,
+  so `Log::spy()` is the only thing keeping a test off the network, and a test
+  that forgets it against the real host posts silently, because a 404 fails
+  nothing. Against a name that cannot resolve, Monolog throws and the test goes
+  red. `WebhookFixturesTest` scans the whole tests tree for the real host.
 - **A literal scan cannot see through a variable**, so `LogLevelTest` pins the
   dynamic call sites separately. Three calls here pass a `$level` through rather
   than naming one — `BaseCommand::log()`, the sweep, and `AppValidate::record()`

@@ -318,11 +318,11 @@ it('never prints the api token or the slack webhook', function () {
     config([
         'logging.default' => 'stack',
         'logging.channels.stack.channels' => ['slack'],
-        'logging.channels.slack.url' => 'https://hooks.slack.com/services/SECRET/WEBHOOK/VALUE',
+        'logging.channels.slack.url' => 'https://hooks.slack.test/services/SECRET/WEBHOOK/VALUE',
     ]);
 
     // without this the level sweep is routed through Monolog's slack handler to
-    // the url above, and really posts - four requests to hooks.slack.com, which
+    // the url above, and really posts - four requests to Slack's webhook host, which
     // 404 and so never fail the test. Http::fake() does not reach the handler;
     // taking the logger out from under it is what does
     Log::spy();
@@ -523,7 +523,7 @@ it('says how many records the sweep posted, and at what', function () {
     config([
         'logging.default' => 'stack',
         'logging.channels.stack.channels' => ['slack'],
-        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.url' => 'https://hooks.slack.test/services/A/B/C',
         'logging.channels.slack.level' => 'error',
     ]);
 
@@ -541,7 +541,7 @@ it('derives that count rather than reciting one', function () {
     config([
         'logging.default' => 'stack',
         'logging.channels.stack.channels' => ['slack'],
-        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.url' => 'https://hooks.slack.test/services/A/B/C',
         'logging.channels.slack.level' => 'emergency',
     ]);
 
@@ -569,7 +569,7 @@ it('does not guess when the threshold is not a log level', function () {
     config([
         'logging.default' => 'stack',
         'logging.channels.stack.channels' => ['slack'],
-        'logging.channels.slack.url' => 'https://hooks.slack.com/services/A/B/C',
+        'logging.channels.slack.url' => 'https://hooks.slack.test/services/A/B/C',
         'logging.channels.slack.level' => 'loud',
     ]);
 
@@ -663,7 +663,7 @@ it('leaves everything but the api alone with --no-api', function () {
 /**
  * A stack with one slack channel in it, at the given threshold.
  */
-function slackStack(string $level, string $url = 'https://hooks.slack.com/services/A/B/C'): void
+function slackStack(string $level, string $url = 'https://hooks.slack.test/services/A/B/C'): void
 {
     config([
         'logging.default' => 'stack',
@@ -731,11 +731,11 @@ it('counts the run summary in when it shares the log webhook', function () {
     // both at one is the obvious thing to do - and then one more message
     // arrives than the sweep sent, which makes a correct count look wrong
     fakeApi([fakeServer()]);
-    slackStack('error', 'https://hooks.slack.com/services/SHARED');
+    slackStack('error', 'https://hooks.slack.test/services/SHARED');
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.com/services/SHARED']);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/services/SHARED']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     [$exit, $output] = validate();
@@ -750,11 +750,11 @@ it('counts the run summary in when it shares the log webhook', function () {
 
 it('does not count it in when the two point somewhere different', function () {
     fakeApi([fakeServer()]);
-    slackStack('error', 'https://hooks.slack.com/services/LOGS');
+    slackStack('error', 'https://hooks.slack.test/services/LOGS');
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.com/services/SUMMARY']);
+    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/services/SUMMARY']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     [$exit, $output] = validate();
