@@ -68,6 +68,14 @@ docker compose run --rm blbackup php blbackup app:validate
 Paths in `.env` name the **container** side of a mount: `DOWNLOAD_PATH=/downloads`,
 not the host directory it maps to.
 
+The host directories behind those mounts are set in the same `.env`, as
+`HOST_DOWNLOAD_PATH` and `HOST_LOG_PATH`. Docker Compose reads them to build the
+mounts; the app never sees them. **They have no default, on purpose:** without
+them `docker compose` refuses to start and names the missing variable. A default
+would put multi-gigabyte images somewhere nobody chose, and `clean` would then
+expire an empty directory while the real backups kept ageing, with every run
+reporting success.
+
 ### As a compiled binary
 
 Each tagged release publishes one on the
@@ -223,7 +231,7 @@ backups.
 One line:
 
 ```cron
-0 2 * * * cd /mnt/user/appdata/blbackup && \
+0 2 * * * cd /opt/blbackup && \
           docker compose run --rm blbackup php blbackup cron >> /var/log/blbackup/cron.log 2>&1
 ```
 

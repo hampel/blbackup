@@ -63,8 +63,15 @@ it('documents every setting the configuration reads', function () {
 
 it('documents no setting the configuration does not read', function () {
     // LARAVEL_STORAGE_PATH is read by the framework rather than by config/, and
-    // is documented because a compiled binary is useless without knowing it
-    $imaginary = array_diff(documentedKeys(), configuredKeys(), ['LARAVEL_STORAGE_PATH']);
+    // is documented because a compiled binary is useless without knowing it.
+    // The HOST_ paths are read by docker compose, which interpolates the same
+    // .env the app is given - the app never sees them, and a container install
+    // cannot start without them
+    $imaginary = array_diff(
+        documentedKeys(),
+        configuredKeys(),
+        ['LARAVEL_STORAGE_PATH', 'HOST_DOWNLOAD_PATH', 'HOST_LOG_PATH']
+    );
 
     expect($imaginary)->toBeEmpty(
         'Documented but never read: ' . implode(', ', $imaginary)

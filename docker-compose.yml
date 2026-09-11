@@ -1,8 +1,8 @@
 # One-shot container, driven by cron on the host. There is no long-running
 # service here, so `docker compose run --rm` rather than `up`:
 #
-#   0 2 * * * cd /mnt/user/appdata/blbackup && \
-#             docker compose run --rm blbackup php blbackup cron >> /mnt/user/logs/blbackup/cron.log 2>&1
+#   0 2 * * * cd /opt/blbackup && \
+#             docker compose run --rm blbackup php blbackup cron >> /var/log/blbackup/cron.log 2>&1
 #
 # `cron` is the whole run - back up, download, move, expire - and the only
 # command that posts a Slack run summary. Set LOCK_FILE in .env to a path under
@@ -38,16 +38,23 @@ services:
         VERSION: ${VERSION:-}
 
     volumes:
-      # Where downloaded backups land. DOWNLOAD_PATH in .env must name the
-      # container side of this mount (/downloads), not the host path - the app
-      # only ever sees the inside.
-      - /mnt/user/Downloads/blbackup/:/downloads
+      # Where downloaded backups land. HOST_DOWNLOAD_PATH in .env is the host
+      # directory; DOWNLOAD_PATH must name the container side of this mount
+      # (/downloads), not the host path - the app only ever sees the inside.
+      #
+      # Both host paths are REQUIRED rather than defaulted, deliberately. A
+      # default would land multi-gigabyte images somewhere nobody chose, and
+      # clean would then expire an empty directory while the real backups aged
+      # forever - with the run succeeding and the summary posting. Unset, docker
+      # compose refuses to start and names the variable, which cron reports.
+      - "${HOST_DOWNLOAD_PATH:?set HOST_DOWNLOAD_PATH in .env to the host directory for backups}:/downloads"
 
-      # LOG_STORAGE_PATH likewise, eg /logs/blbackup.log. A path that is not
-      # under a mount is written into the container and lost when it exits -
-      # and if the directory cannot be written at all, every command dies on
-      # its first API call, because App\Api logs every call.
-      - /mnt/user/logs/blbackup/:/logs
+      # LOG_STORAGE_PATH likewise, eg /logs/blbackup.log, with HOST_LOG_PATH the
+      # host directory behind it. A path that is not under a mount is written
+      # into the container and lost when it exits - and if the directory cannot
+      # be written at all, every command dies on its first API call, because
+      # App\Api logs every call.
+      - "${HOST_LOG_PATH:?set HOST_LOG_PATH in .env to the host directory for logs}:/logs"
 
       # Read-only: the container has no business rewriting its own settings.
       - ./.env:/app/.env:ro

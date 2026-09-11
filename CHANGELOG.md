@@ -6,6 +6,25 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Container installs must now set `HOST_DOWNLOAD_PATH` and `HOST_LOG_PATH` in
+  `.env`.** `docker-compose.yml` no longer hardcodes the host directories behind
+  its two mounts; it reads them from the same `.env` the app is given. **Add both
+  before pulling this change**, set to the directories the compose file used to
+  name. Adding them first does no harm, because the old compose file ignores them
+  and so does the app. Pull first and `docker compose` refuses to start until
+  they are set.
+
+  They have no default, on purpose. A default would put backups somewhere nobody
+  chose, and `clean` would then expire an empty directory while the real backups
+  kept ageing, with every run reporting success. Unset, `docker compose` stops
+  and names the missing variable. `DOWNLOAD_PATH` and `LOG_STORAGE_PATH` are
+  unchanged: they still name the container side. A compiled binary ignores all
+  of this.
+
 ## [2.4.0] - 2026-09-10
 
 ### Changed
