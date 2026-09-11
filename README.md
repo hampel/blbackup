@@ -74,7 +74,9 @@ mounts; the app never sees them. **They have no default, on purpose:** without
 them `docker compose` refuses to start and names the missing variable. A default
 would put multi-gigabyte images somewhere nobody chose, and `clean` would then
 expire an empty directory while the real backups kept ageing, with every run
-reporting success.
+reporting success. **Both directories must already exist:** a path that does
+not is refused rather than created, so a typo stops the run instead of quietly
+becoming an empty directory the backups go into.
 
 ### As a compiled binary
 

@@ -21,7 +21,9 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   They have no default, on purpose. A default would put backups somewhere nobody
   chose, and `clean` would then expire an empty directory while the real backups
   kept ageing, with every run reporting success. Unset, `docker compose` stops
-  and names the missing variable. `DOWNLOAD_PATH` and `LOG_STORAGE_PATH` are
+  and names the missing variable. A path that does not exist is refused too,
+  rather than created as an empty directory, so a typo fails the same way — and
+  both directories must already exist. `DOWNLOAD_PATH` and `LOG_STORAGE_PATH` are
   unchanged: they still name the container side. A compiled binary ignores all
   of this.
 

@@ -47,14 +47,30 @@ services:
       # clean would then expire an empty directory while the real backups aged
       # forever - with the run succeeding and the summary posting. Unset, docker
       # compose refuses to start and names the variable, which cron reports.
-      - "${HOST_DOWNLOAD_PATH:?set HOST_DOWNLOAD_PATH in .env to the host directory for backups}:/downloads"
+      #
+      # And a path that does not exist is refused rather than created. That is
+      # why these two use the long syntax: the short form creates a missing
+      # host path as an empty directory, so a typo was the same silent failure
+      # as a default - backups written into a directory nobody meant to use.
+      - type: bind
+        source: "${HOST_DOWNLOAD_PATH:?set HOST_DOWNLOAD_PATH in .env to the host directory for backups}"
+        target: /downloads
+        bind:
+          # `docker compose config` shows this as `bind: {}`. False is the zero
+          # value and is left out of the render, not lost - verified against
+          # the daemon, which refuses a missing path with it set.
+          create_host_path: false
 
       # LOG_STORAGE_PATH likewise, eg /logs/blbackup.log, with HOST_LOG_PATH the
       # host directory behind it. A path that is not under a mount is written
       # into the container and lost when it exits - and if the directory cannot
       # be written at all, every command dies on its first API call, because
       # App\Api logs every call.
-      - "${HOST_LOG_PATH:?set HOST_LOG_PATH in .env to the host directory for logs}:/logs"
+      - type: bind
+        source: "${HOST_LOG_PATH:?set HOST_LOG_PATH in .env to the host directory for logs}"
+        target: /logs
+        bind:
+          create_host_path: false
 
       # Read-only: the container has no business rewriting its own settings.
       - ./.env:/app/.env:ro
