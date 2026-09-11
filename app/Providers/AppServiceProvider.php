@@ -45,7 +45,7 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Log\Context\ContextLogProcessor::class
         );
 
-        // shared for the same reason wback shares its: the stages of a run are
+        // shared because the stages of a run are
         // separate command objects - create calls download, download calls move -
         // and the run is what is being summarised rather than any one of them
         // a singleton because cron takes the lock for a whole run and the stages

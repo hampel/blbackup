@@ -357,11 +357,11 @@ it('writes a record at every level on every attended run', function () {
 
 it('reports the hostname records are stamped with', function () {
     fakeApi([fakeServer()]);
-    config(['logging.default' => 'single', 'logging.hostname' => 'unraid']);
+    config(['logging.default' => 'single', 'logging.hostname' => 'nas.example.test']);
 
     [$exit, $output] = validate();
 
-    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] log hostname')->toContain('unraid');
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] log hostname')->toContain('nas.example.test');
 });
 
 it('reports unstamped records as a skip rather than a pass', function () {
@@ -378,7 +378,7 @@ it('reports unstamped records as a skip rather than a pass', function () {
 
 it('stamps records with the hostname', function () {
     $logger = new Monolog\Logger('test');
-    config(['logging.hostname' => 'unraid']);
+    config(['logging.hostname' => 'nas.example.test']);
 
     (new App\Logging\StampHostname)(new Illuminate\Log\Logger($logger));
 
@@ -391,7 +391,7 @@ it('stamps records with the hostname', function () {
         $record = $processor($record);
     }
 
-    expect($record->extra)->toBe(['hostname' => 'unraid']);
+    expect($record->extra)->toBe(['hostname' => 'nas.example.test']);
 });
 
 it('leaves records unstamped when no hostname is configured', function () {

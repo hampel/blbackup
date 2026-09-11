@@ -31,7 +31,7 @@ function reporter(array &$history, string $notify = 'always', string $webhook = 
         $webhook,
         $notify,
         'BinaryLane Backup 1.9.2',
-        'unraid'
+        'nas.example.test'
     );
 }
 
@@ -54,13 +54,13 @@ it('reports a good run with what it produced', function () {
     $attachment = $payload['attachments'][0];
     $fields = collect($attachment['fields'])->pluck('value', 'title');
 
-    expect($payload['text'])->toBe('Backup completed on unraid')
+    expect($payload['text'])->toBe('Backup completed on nas.example.test')
         ->and($attachment['color'])->toBe('good')
         ->and($fields['Servers'])->toBe('1')
         ->and($fields['Backups taken'])->toBe('1')
         ->and($fields['Downloaded'])->toBe('1 (2.00 GB)')
         ->and($fields['Moved to remote'])->toBe('1')
-        ->and($attachment['footer'])->toBe('BinaryLane Backup 1.9.2 on unraid');
+        ->and($attachment['footer'])->toBe('BinaryLane Backup 1.9.2 on nas.example.test');
 });
 
 it('names the server and the stage that failed', function () {
@@ -75,7 +75,7 @@ it('names the server and the stage that failed', function () {
     $payload = sentPayload($history);
     $attachment = $payload['attachments'][0];
 
-    expect($payload['text'])->toBe('Backup failed on unraid')
+    expect($payload['text'])->toBe('Backup failed on nas.example.test')
         ->and($attachment['color'])->toBe('danger')
         // the body renders above the fields in Slack, so failures are read first
         ->and($attachment['text'])->toBe('db1.example.com (download): wget: unable to resolve host')
@@ -92,7 +92,7 @@ it('reports a run that never started, without counts', function () {
 
     $payload = sentPayload($history);
 
-    expect($payload['text'])->toBe('Backup did not run on unraid')
+    expect($payload['text'])->toBe('Backup did not run on nas.example.test')
         // a row of zeroes would read as a run that started and found nothing
         ->and($payload['attachments'][0]['fields'] ?? [])->toBe([])
         ->and($payload['attachments'][0]['text'])->toContain('the API token may be wrong');
@@ -105,7 +105,7 @@ it('marks a dry run', function () {
 
     reporter($history)->send($summary);
 
-    expect(sentPayload($history)['text'])->toBe('[Dry run] Backup completed on unraid');
+    expect(sentPayload($history)['text'])->toBe('[Dry run] Backup completed on nas.example.test');
 });
 
 it('caps the failures it quotes', function () {
@@ -164,7 +164,7 @@ it('sends a failed run whatever notify says', function () {
 it('raises when slack refuses the message', function () {
     $history = [];
     $slack = slackTransport($history, [new Response(403, [], 'invalid_token')]);
-    $reporter = new SlackSummary($slack, 'https://hooks.slack.test/abc', 'always', 'app', 'unraid');
+    $reporter = new SlackSummary($slack, 'https://hooks.slack.test/abc', 'always', 'app', 'nas.example.test');
 
     $summary = new RunSummary;
     $summary->claim('create');
@@ -179,7 +179,7 @@ it('posts a test message that says where it came from', function () {
 
     $payload = sentPayload($history);
 
-    expect($payload['text'])->toContain('Test message from app:validate on unraid')
+    expect($payload['text'])->toContain('Test message from app:validate on nas.example.test')
         ->and($payload['attachments'][0]['color'])->toBe('good');
 });
 
@@ -189,7 +189,7 @@ it('formats durations at the boundaries', function () {
         public function seconds() : float { return $this->fake; }
     };
 
-    $reporter = new SlackSummary(new SlackWebhook(new Client), 'https://hooks.slack.test/abc', 'always', 'app', 'unraid');
+    $reporter = new SlackSummary(new SlackWebhook(new Client), 'https://hooks.slack.test/abc', 'always', 'app', 'nas.example.test');
     $duration = (new ReflectionMethod($reporter, 'duration'))->getClosure($reporter);
 
     expect($duration(0.4))->toBe('<1s')      // not "0s", which reads as unmeasured
@@ -211,7 +211,7 @@ function interceptSummary(array &$history, string $notify = 'always', string $we
     $transport = slackTransport($history, $responses);
 
     app()->singleton(SlackSummary::class, fn () => new SlackSummary(
-        $transport, $webhook, $notify, 'BinaryLane Backup 1.9.2', 'unraid'
+        $transport, $webhook, $notify, 'BinaryLane Backup 1.9.2', 'nas.example.test'
     ));
 }
 
@@ -232,7 +232,7 @@ it('posts one summary for a run, not one per stage', function () {
 
     $fields = collect(sentPayload($history)['attachments'][0]['fields'])->pluck('value', 'title');
 
-    expect(sentPayload($history)['text'])->toBe('Backup completed on unraid')
+    expect(sentPayload($history)['text'])->toBe('Backup completed on nas.example.test')
         ->and($fields['Backups taken'])->toBe('1')
         ->and($fields['Downloaded'])->toBe('1 (1.0 MB)')
         ->and($fields['Moved to remote'])->toBe('1');
@@ -260,7 +260,7 @@ it('reports the failure a run recorded', function () {
 
     $this->artisan('cron', ['--no-clean' => true])->assertFailed();
 
-    expect(sentPayload($history)['text'])->toBe('Backup failed on unraid')
+    expect(sentPayload($history)['text'])->toBe('Backup failed on nas.example.test')
         ->and(sentPayload($history)['attachments'][0]['text'])->toContain('web1.example.com (create): backup errored');
 });
 
@@ -303,7 +303,7 @@ it('reports a run that could not start at all', function () {
 
     $payload = sentPayload($history);
 
-    expect($payload['text'])->toBe('Backup did not run on unraid')
+    expect($payload['text'])->toBe('Backup did not run on nas.example.test')
         ->and($payload['attachments'][0]['text'])->toContain('No server data returned')
         ->and($payload['attachments'][0]['fields'] ?? [])->toBe([]);
 });
@@ -318,7 +318,7 @@ it('reports an unreadable server list as a run that did not start', function () 
     // is the one that owns the run - so the block has to cross that boundary
     $this->artisan('cron', ['--include' => '/no/such/list.txt', '--no-clean' => true])->assertFailed();
 
-    expect(sentPayload($history)['text'])->toBe('Backup did not run on unraid')
+    expect(sentPayload($history)['text'])->toBe('Backup did not run on nas.example.test')
         ->and(sentPayload($history)['attachments'][0]['text'])->toContain('/no/such/list.txt');
 });
 
@@ -352,7 +352,7 @@ it('reports a run skipped for the lock as one that did not happen', function () 
 
     // a backup that did not happen is the failure worth hearing about most, and
     // the one that otherwise leaves nothing behind but a single log line
-    expect(sentPayload($history)['text'])->toBe('Backup did not run on unraid')
+    expect(sentPayload($history)['text'])->toBe('Backup did not run on nas.example.test')
         ->and(sentPayload($history)['attachments'][0]['text'])->toContain('Another backup is still running')
         ->and(sentPayload($history)['attachments'][0]['fields'] ?? [])->toBe([]);
 

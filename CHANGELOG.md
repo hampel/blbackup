@@ -203,7 +203,7 @@ every push and did not exist before.
 - **`.env.example` showed an example as though it were the default**, in three
   places. Its header promised every setting was shown with the default it takes
   when left unset, and `LOCK_FILE=/logs/blbackup.lock`, `LOG_STACK=single,slack`
-  and `LOG_HOSTNAME=unraid` were none of them defaults. The first cost real time:
+  and an example `LOG_HOSTNAME` were none of them defaults. The first cost real time:
   it read as though the lock was already on a shared mount, when the default put
   it inside the container where it does nothing. Lines that cannot show a default
   are now marked EXAMPLE and say what the default really is.

@@ -269,8 +269,6 @@ class AppValidate extends BaseCommand
     }
 
     /**
-     * The same shape as wback's, so the two tools report their logging alike.
-     *
      * Records are written at every level on every attended run: a destination
      * with a threshold only proves it works when something at that level is
      * actually sent, and a webhook that has been revoked says nothing about it
@@ -332,7 +330,7 @@ class AppValidate extends BaseCommand
             }
             else
             {
-                // wback writes the records first and would die here inside Monolog;
+                // writing the records first would die here inside Monolog;
                 // checking before writing is what lets this be reported instead
                 $this->reportFail("log path ({$name})", "{$path} is not writable");
 

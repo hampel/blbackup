@@ -443,9 +443,9 @@ most need it. The rule, and it generalises past this command:
 > anything below it is suppressed too, whatever the docblock says.
 
 Worth stating because it is the same failure as the one that started this —
-something that reads as configured and cannot fire — and because `wback` hit it
-independently, in its own implementation, and neither of us got the order right
-first time. A mutation that moves the call back below the flag check fails a
+something that reads as configured and cannot fire — and because two separate
+implementations of this pattern made the same mistake, neither getting the order
+right first time. A mutation that moves the call back below the flag check fails a
 test, so it cannot drift back.
 
 **The delivery count includes the run summary when the two share a webhook.**
@@ -453,10 +453,6 @@ test, so it cannot drift back.
 settings and usually separate channels, but pointing both at one is the obvious
 thing to do — and then one more message arrives than the sweep sent, which makes
 a correct count look wrong and trains the operator to ignore the line.
-
-The pattern, and the argument for each of those decisions, is written up at
-`/srv/www/validate-and-config.html`; `wback` is the reference implementation, and
-found this one.
 
 `config/logging.php` stamps every record with `logging.hostname` through the
 `StampHostname` tap, so one webhook can serve more than one installation. It has

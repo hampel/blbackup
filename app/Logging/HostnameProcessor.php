@@ -14,7 +14,7 @@ use Monolog\Processor\ProcessorInterface;
  *
  * It earns its place here even with one installation: this runs inside a container,
  * and a container calls itself a random hex string that changes every time the image
- * is rebuilt. LOG_HOSTNAME is what makes the records say "unraid" instead.
+ * is rebuilt. LOG_HOSTNAME is what makes the records carry a name you chose instead.
  */
 class HostnameProcessor implements ProcessorInterface
 {
