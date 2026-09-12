@@ -16,3 +16,4 @@ rclone.conf
 # covered by ~/.config/git/ignore on this machine, which a clone elsewhere would
 # not have.
 *:Zone.Identifier
+.env.tpl
