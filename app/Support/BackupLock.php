@@ -99,6 +99,6 @@ class BackupLock
 
     public function path() : string
     {
-        return config('binarylane.lock_file');
+        return config('blbackup.lock_file');
     }
 }

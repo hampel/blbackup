@@ -173,7 +173,7 @@ class Cron extends BaseCommand
      */
     protected function remote() : ?string
     {
-        $remote = trim((string) config('binarylane.rclone.remote'));
+        $remote = trim((string) config('blbackup.rclone.remote'));
 
         return $remote === '' ? null : $remote;
     }

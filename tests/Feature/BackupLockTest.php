@@ -91,7 +91,7 @@ it('fails rather than running unlocked when the lock file cannot be opened', fun
 
     File::ensureDirectoryExists($path);
 
-    config(['binarylane.lock_file' => $path]);
+    config(['blbackup.lock_file' => $path]);
 
     fakeApi([fakeServer()]);
     fakeBinaries();

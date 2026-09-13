@@ -61,7 +61,7 @@ it('reports a backup that errors', function () {
 });
 
 it('gives up on a backup that exceeds the timeout', function () {
-    config(['binarylane.timeout' => 15]);
+    config(['blbackup.timeout' => 15]);
 
     // the clock moves while the backup is being polled, which is the only way
     // the elapsed-time check in the poll loop can ever trip
@@ -115,7 +115,7 @@ it('skips the servers named in an exclude file', function () {
 it('takes the exclude list from configuration when no option is given', function () {
     fakeApi([$this->server, $this->other]);
 
-    config(['binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
+    config(['blbackup.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
 
     $this->artisan('create', ['--all' => true])->assertSuccessful();
 
@@ -126,7 +126,7 @@ it('takes the exclude list from configuration when no option is given', function
 it('takes the include list from configuration when no option is given', function () {
     fakeApi([$this->server, $this->other]);
 
-    config(['binarylane.include_file' => writeServerList('include.txt', ['db1.example.com'])]);
+    config(['blbackup.include_file' => writeServerList('include.txt', ['db1.example.com'])]);
 
     $this->artisan('create', ['--all' => true])->assertSuccessful();
 
@@ -137,7 +137,7 @@ it('takes the include list from configuration when no option is given', function
 it('lets the option override the configured list', function () {
     fakeApi([$this->server, $this->other]);
 
-    config(['binarylane.exclude_file' => writeServerList('configured.txt', ['db1.example.com'])]);
+    config(['blbackup.exclude_file' => writeServerList('configured.txt', ['db1.example.com'])]);
 
     $this->artisan('create', [
         '--all' => true,
@@ -154,7 +154,7 @@ it('trims the lines of a server list, so a file written on windows still matches
 
     Storage::disk('downloads')->put('crlf.txt', "db1.example.com\r\n");
 
-    config(['binarylane.exclude_file' => downloadPath('crlf.txt')]);
+    config(['blbackup.exclude_file' => downloadPath('crlf.txt')]);
 
     $this->artisan('create', ['--all' => true])->assertSuccessful();
 
@@ -167,7 +167,7 @@ it('backs up everything when the configured list names no servers', function () 
 
     // the safe way round: a truncated list must not silently stop the backups.
     // app:validate is what warns that it has stopped filtering
-    config(['binarylane.include_file' => writeServerList('empty.txt', [])]);
+    config(['blbackup.include_file' => writeServerList('empty.txt', [])]);
 
     $this->artisan('create', ['--all' => true])->assertSuccessful();
 
@@ -178,7 +178,7 @@ it('backs up everything when the configured list names no servers', function () 
 it('fails when the configured exclude file cannot be read', function () {
     fakeApi([$this->server]);
 
-    config(['binarylane.exclude_file' => '/no/such/list.txt']);
+    config(['blbackup.exclude_file' => '/no/such/list.txt']);
 
     $this->artisan('create', ['--all' => true])
         ->expectsOutputToContain('Exclude file [/no/such/list.txt] does not exists or is not readable')

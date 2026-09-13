@@ -20,7 +20,7 @@ it('sends the configured token to the binarylane v2 api', function () {
 });
 
 it('applies the configured timezone as the default', function () {
-    config(['binarylane.timezone' => 'America/New_York']);
+    config(['blbackup.timezone' => 'America/New_York']);
 
     // the provider booted with the .env value when the test application was
     // created, so it has to be re-run to see the config set above

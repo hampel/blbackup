@@ -39,7 +39,7 @@ class Move extends BaseCommand
      */
     public function handle()
     {
-        $remote = $this->option('remote') ?? config('binarylane.rclone.remote');
+        $remote = $this->option('remote') ?? config('blbackup.rclone.remote');
         if (empty($remote))
         {
             $this->fail("No remote configured - specify RCLONE_REMOTE in .env file or use --remote option");
@@ -124,7 +124,7 @@ class Move extends BaseCommand
 
         $size = Storage::disk('downloads')->size($path);
 
-        $rclone = config('binarylane.rclone.binary');
+        $rclone = config('blbackup.rclone.binary');
         $sourcePath = Storage::disk('downloads')->path($path);
 
         $verbosity = $this->getVerbosity();
@@ -226,7 +226,7 @@ class Move extends BaseCommand
 
     protected function isValidRemote(string $remote) : bool
     {
-        $rclone = config('binarylane.rclone.binary');
+        $rclone = config('blbackup.rclone.binary');
         $cmd = "{$rclone} lsd --quiet {$remote}";
 
         $this->logCmd('rclone lsd', $cmd);

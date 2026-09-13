@@ -146,7 +146,7 @@ class Create extends BaseCommand
         $progress = $this->progressBar();
         $progress->start();
 
-        $timeout = config('binarylane.timeout');
+        $timeout = config('blbackup.timeout');
 
         Sleep::for(10)->seconds()->while(function () use ($server, $action, $start, $progress, $timeout, &$status) {
             $status = $this->api->action($action['id']);

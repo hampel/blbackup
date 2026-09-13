@@ -223,7 +223,7 @@ abstract class BaseCommand extends Command
      */
     protected function serverList(string $which) : ?array
     {
-        $path = $this->option($which) ?: config("binarylane.{$which}_file");
+        $path = $this->option($which) ?: config("blbackup.{$which}_file");
 
         if (empty($path))
         {

@@ -40,7 +40,7 @@ php blbackup app:build blbackup  # compile a PHAR into builds/ (box.json)
 
 `--include` / `--exclude` take a path to a plain-text file, one server hostname
 per line, filtered against `$server['name']`, and default to
-`binarylane.include_file` / `binarylane.exclude_file` when the option is absent.
+`blbackup.include_file` / `blbackup.exclude_file` when the option is absent.
 `clean` prompts for confirmation unless `--dry-run` or `--no-interaction`.
 
 ## The pipeline
@@ -202,7 +202,7 @@ application string and hostname all arrive through its constructor, and
 `AppServiceProvider` does the reading. Keep it that way — if a new setting is
 needed in a message, add a constructor argument and bind it, don't reach for
 `config()` inside the class. The `slack` log channel stays as the backstop; the
-two are complementary, and `config/binarylane.php` says why: a log channel posts
+two are complementary, and `config/blbackup.php` says why: a log channel posts
 a record at a time, so a night where everything worked produces nothing at all.
 
 Tests fake at the HTTP client (`MockHandler` + `Middleware::history()`) and
@@ -229,7 +229,7 @@ night, which is the failure mode that makes an exit code worth nothing.
 
 **`BaseCommand::serverList('include'|'exclude')`** resolves the server lists for
 `create` and `download`, which had the same twenty lines twice. The option wins
-for one run; `binarylane.include_file` / `binarylane.exclude_file` is what an
+for one run; `blbackup.include_file` / `blbackup.exclude_file` is what an
 unattended install is read out of, and exists so that `app:config` can show the
 list and `app:validate` can check it — a path that lives only on the crontab line
 is unverifiable, and the way it fails is the worst kind: the run completes, the
@@ -275,7 +275,7 @@ it breaks the redraw (see the `Log::debug` in `Create::backup()` for the pattern
 **Filenames encode the source.** Downloads land at
 `<download disk>/<server name>/backup-<short name>-<Ymd-His>-<image id>.zst`,
 where the datestamp is the image's `created_at` converted to
-`binarylane.timezone` and the short name is the first dot-separated label of the
+`blbackup.timezone` and the short name is the first dot-separated label of the
 hostname. `move` preserves that relative path under the rclone remote, and both
 `download`'s already-exists check and `clean`'s expiry rely on it.
 
@@ -292,7 +292,7 @@ built from `Storage::disk('downloads')->path(…)`.
 
 ## Configuration and packaging
 
-Everything app-specific is env-driven through `config/binarylane.php` — API
+Everything app-specific is env-driven through `config/blbackup.php` — API
 token, download timeout, the three binary paths, `keeponly_days`, the rclone
 remote, and the timezone. Read it through `config()`, never `env()` outside
 `config/`. `.env.example` documents every variable with its default; `.env`
@@ -317,7 +317,7 @@ is the gate a rebuild has to pass anyway.
 **Never put an `env()` call in `config/app.php`.** `app:build` evaluates that file
 on the build machine and compiles it in as a literal array, so the value freezes
 at build time and no `.env` beside the binary can change it. That is why the
-timezone lives as `binarylane.timezone` and is applied with
+timezone lives as `blbackup.timezone` and is applied with
 `date_default_timezone_set()` in `AppServiceProvider::boot()` rather than as
 `app.timezone`. `bootstrap/app.php` likewise repoints the storage path at
 `getcwd()` when running inside a Phar, so a compiled binary resolves logs and the

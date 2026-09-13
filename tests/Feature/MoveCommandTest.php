@@ -66,7 +66,7 @@ it('moves to the remote named by --remote', function () {
 });
 
 it('fails when no remote is configured', function () {
-    config(['binarylane.rclone.remote' => null]);
+    config(['blbackup.rclone.remote' => null]);
     putDownload($this->path, MEGABYTE);
     fakeBinaries();
 

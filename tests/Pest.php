@@ -32,20 +32,20 @@ use Illuminate\Support\Facades\Storage;
 uses(Tests\TestCase::class)
     ->beforeEach(function () {
         config([
-            'binarylane.api_token' => 'test-token',
-            'binarylane.timeout' => 3600,
-            'binarylane.timezone' => 'Australia/Sydney',
-            'binarylane.zstd_binary' => '/usr/bin/zstd',
-            'binarylane.wget_binary' => '/usr/bin/wget',
-            'binarylane.rclone.binary' => '/usr/bin/rclone',
-            'binarylane.rclone.remote' => 'remote:backups',
-            'binarylane.lock_file' => storage_path('framework/testing/blbackup.lock'),
+            'blbackup.api_token' => 'test-token',
+            'blbackup.timeout' => 3600,
+            'blbackup.timezone' => 'Australia/Sydney',
+            'blbackup.zstd_binary' => '/usr/bin/zstd',
+            'blbackup.wget_binary' => '/usr/bin/wget',
+            'blbackup.rclone.binary' => '/usr/bin/rclone',
+            'blbackup.rclone.remote' => 'remote:backups',
+            'blbackup.lock_file' => storage_path('framework/testing/blbackup.lock'),
 
             // no server list unless a test asks for one - the project .env is
             // loaded here too, and a developer who has configured one would
             // otherwise find every test filtering its server list
-            'binarylane.include_file' => null,
-            'binarylane.exclude_file' => null,
+            'blbackup.include_file' => null,
+            'blbackup.exclude_file' => null,
 
             // the project .env is loaded in tests too, and without this the
             // suite appends to whatever log the developer has configured
@@ -55,7 +55,7 @@ uses(Tests\TestCase::class)
             // has configured - 41 real messages per run, measured. SlackSummary
             // is resolved from the container with a real Guzzle client, which
             // Http::fake() cannot see, so nothing else here was going to stop it
-            'binarylane.summary.slack_webhook' => null,
+            'blbackup.summary.slack_webhook' => null,
 
             // the shipped default rather than the developer's: a test that says
             // how many records a threshold posts has to be reading the threshold
@@ -149,7 +149,7 @@ function fakeAction(string $status = 'completed', int $percent = 100, int $id = 
 
 /**
  * The path the download command derives for an image: the datestamp is the
- * image's created_at in binarylane.timezone, not UTC.
+ * image's created_at in blbackup.timezone, not UTC.
  */
 function backupPath(string $server = 'web1.example.com', string $short = 'web1', string $date = '20260821-003000', int $image = 12345): string
 {
@@ -292,7 +292,7 @@ function recordingSlack(array &$sent): void
  */
 function holdLock(string $holder = 'pid 999, cron, started 2026-08-26 02:00:00'): mixed
 {
-    $path = config('binarylane.lock_file');
+    $path = config('blbackup.lock_file');
 
     File::ensureDirectoryExists(dirname($path));
 

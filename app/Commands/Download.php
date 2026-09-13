@@ -183,7 +183,7 @@ class Download extends BaseCommand
     protected function downloadImage(array $image, array $server, array $link) : bool
     {
         $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])
-            ->setTimezone(config('binarylane.timezone'))
+            ->setTimezone(config('blbackup.timezone'))
             ->format("Ymd-His");
 
         if (!Storage::disk('downloads')->exists($server['name']))
@@ -397,7 +397,7 @@ class Download extends BaseCommand
 
     protected function downloadWget(string $url, string $path) : bool
     {
-        $wget = config('binarylane.wget_binary');
+        $wget = config('blbackup.wget_binary');
 
         $cmd = "{$wget} {$url} -O {$path}";
 
@@ -489,8 +489,8 @@ class Download extends BaseCommand
 
     protected function remoteFileInfo(string $path) : ?array
     {
-        $rclone = config('binarylane.rclone.binary');
-        $remotePath = rtrim(config('binarylane.rclone.remote'), '/');
+        $rclone = config('blbackup.rclone.binary');
+        $remotePath = rtrim(config('blbackup.rclone.remote'), '/');
 
         $cmd = "{$rclone} lsjson --stat --no-mimetype --no-modtime {$remotePath}/{$path}";
 

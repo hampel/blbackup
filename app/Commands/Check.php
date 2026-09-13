@@ -109,7 +109,7 @@ class Check extends BaseCommand
 
     protected function testDownload(string $path) : bool
     {
-        $binary = config('binarylane.zstd_binary');
+        $binary = config('blbackup.zstd_binary');
 
         $cmd = "{$binary} --test --no-progress --quiet {$path}";
 

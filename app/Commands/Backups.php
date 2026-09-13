@@ -130,7 +130,7 @@ class Backups extends BaseCommand
                     'image_id' => Str::padLeft($image['id'], 9),
                     'full_name' => $image['full_name'],
                     'created_at' => $created->toDateTimeString(),
-                    'created_at_local' => $created->timezone(config('binarylane.timezone'))->toDateTimeString(),
+                    'created_at_local' => $created->timezone(config('blbackup.timezone'))->toDateTimeString(),
                     'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
                 ];
             });

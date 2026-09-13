@@ -36,7 +36,7 @@ class Clean extends BaseCommand
      */
     public function handle()
     {
-        $keeponly = intval($this->option('days') ?? config('binarylane.keeponly_days'));
+        $keeponly = intval($this->option('days') ?? config('blbackup.keeponly_days'));
         $path = Storage::disk('downloads')->path('');
 
         $this->log(
@@ -112,8 +112,8 @@ class Clean extends BaseCommand
 
         if ($this->option('remote'))
         {
-            $rclone = config('binarylane.rclone.binary');
-            $remotePath = rtrim(config('binarylane.rclone.remote'), '/');
+            $rclone = config('blbackup.rclone.binary');
+            $remotePath = rtrim(config('blbackup.rclone.remote'), '/');
 
             $cmd = "{$rclone} lsjson -R  {$remotePath}";
 

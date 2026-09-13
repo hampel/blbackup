@@ -19,10 +19,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Http::macro('binarylane', function () : PendingRequest {
-            return Http::withToken(config('binarylane.api_token'))->baseUrl('https://api.binarylane.com.au/v2');
+            return Http::withToken(config('blbackup.api_token'))->baseUrl('https://api.binarylane.com.au/v2');
         });
 
-        date_default_timezone_set(config('binarylane.timezone', 'UTC'));
+        date_default_timezone_set(config('blbackup.timezone', 'UTC'));
     }
 
     /**
@@ -35,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
         // container, where there is no .git and no git binary. Left alone when
         // nothing is configured, so a checkout and a compiled binary keep
         // reporting the tag they really came from.
-        if ($version = config('binarylane.version'))
+        if ($version = config('blbackup.version'))
         {
             config(['app.version' => $version]);
         }
@@ -72,8 +72,8 @@ class AppServiceProvider extends ServiceProvider
         // usable somewhere config() and app() do not exist
         $this->app->singleton(SlackSummary::class, fn () => new SlackSummary(
             $this->app->make(SlackWebhook::class),
-            (string) config('binarylane.summary.slack_webhook'),
-            (string) config('binarylane.summary.notify'),
+            (string) config('blbackup.summary.slack_webhook'),
+            (string) config('blbackup.summary.notify'),
             config('app.name') . ' ' . $this->app->version(),
             (string) (config('logging.hostname') ?: gethostname())
         ));

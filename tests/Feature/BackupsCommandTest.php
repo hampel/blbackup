@@ -49,7 +49,7 @@ it('lists every backup image when given no server', function () {
 });
 
 it('shows the creation time in UTC and in the configured timezone', function () {
-    config(['binarylane.timezone' => 'America/New_York']);
+    config(['blbackup.timezone' => 'America/New_York']);
     fakeApi([$this->server], [$this->image]);
 
     // both columns come from the one timestamp: 14:30 UTC is 10:30 in New York

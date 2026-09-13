@@ -24,7 +24,7 @@ it('reports the version through app:config', function () {
 });
 
 it('applies a configured version over what git could not work out', function () {
-    config(['app.version' => 'unreleased', 'binarylane.version' => '2.1.1']);
+    config(['app.version' => 'unreleased', 'blbackup.version' => '2.1.1']);
 
     (new AppServiceProvider(app()))->register();
 
@@ -34,7 +34,7 @@ it('applies a configured version over what git could not work out', function () 
 it('leaves the version alone when none is configured', function () {
     // a checkout and a compiled binary both know what they are, and must keep
     // reporting the tag they really came from
-    config(['app.version' => '2.1.1', 'binarylane.version' => null]);
+    config(['app.version' => '2.1.1', 'blbackup.version' => null]);
 
     (new AppServiceProvider(app()))->register();
 

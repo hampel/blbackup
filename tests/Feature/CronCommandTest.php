@@ -40,7 +40,7 @@ it('backs up, downloads, moves and expires when a remote is configured', functio
 });
 
 it('downloads and keeps the file when no remote is configured', function () {
-    config(['binarylane.rclone.remote' => null]);
+    config(['blbackup.rclone.remote' => null]);
 
     $this->artisan('cron')
         ->expectsOutputToContain('downloading only - no rclone remote is configured')

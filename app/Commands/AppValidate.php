@@ -121,9 +121,9 @@ class AppValidate extends BaseCommand
         $this->checkServerList('exclude');
 
         $this->checkSection("External commands");
-        $this->checkBinary('zstd', config('binarylane.zstd_binary'), '--version');
-        $this->checkBinary('wget', config('binarylane.wget_binary'), '--version');
-        $this->checkBinary('rclone', config('binarylane.rclone.binary'), '--version');
+        $this->checkBinary('zstd', config('blbackup.zstd_binary'), '--version');
+        $this->checkBinary('wget', config('blbackup.wget_binary'), '--version');
+        $this->checkBinary('rclone', config('blbackup.rclone.binary'), '--version');
         $this->checkRemote();
 
         $this->checkSection("Run summary");
@@ -199,7 +199,7 @@ class AppValidate extends BaseCommand
 
     protected function checkTimezone() : void
     {
-        $timezone = config('binarylane.timezone');
+        $timezone = config('blbackup.timezone');
 
         if (in_array($timezone, timezone_identifiers_list()))
         {
@@ -487,7 +487,7 @@ class AppValidate extends BaseCommand
             // the run summary usually points at the same channel, and when it
             // does, one more message arrives than the sweep sent - which turns a
             // correct count into one that does not match what the operator sees
-            $summary = (string) config('binarylane.summary.slack_webhook');
+            $summary = (string) config('blbackup.summary.slack_webhook');
             $shared = $summary !== '' && $summary === config("logging.channels.{$name}.url");
 
             $this->reportOk("log delivery ({$name})", sprintf(
@@ -585,7 +585,7 @@ class AppValidate extends BaseCommand
         }
 
         $this->reportOk('run summary', 'test message delivered, sent on '
-            . config('binarylane.summary.notify'));
+            . config('blbackup.summary.notify'));
     }
 
     protected function checkBinary(string $label, ?string $binary, string $versionFlag) : void
@@ -649,7 +649,7 @@ class AppValidate extends BaseCommand
 
     protected function checkRemote() : void
     {
-        $remote = config('binarylane.rclone.remote');
+        $remote = config('blbackup.rclone.remote');
 
         if (empty($remote))
         {
@@ -675,7 +675,7 @@ class AppValidate extends BaseCommand
         // of the command whose whole job is to report a failure legibly
         try
         {
-            $result = Process::run(config('binarylane.rclone.binary') . " lsd --quiet {$remote}");
+            $result = Process::run(config('blbackup.rclone.binary') . " lsd --quiet {$remote}");
         }
         catch (ProcessTimedOutException $e)
         {
@@ -696,7 +696,7 @@ class AppValidate extends BaseCommand
 
     protected function checkApi() : void
     {
-        if (empty(config('binarylane.api_token')))
+        if (empty(config('blbackup.api_token')))
         {
             $this->reportFail("API token", "not configured");
 
@@ -868,7 +868,7 @@ class AppValidate extends BaseCommand
     protected function checkServerList(string $which) : void
     {
         $label = "{$which} list";
-        $path = config("binarylane.{$which}_file");
+        $path = config("blbackup.{$which}_file");
 
         if (empty($path))
         {

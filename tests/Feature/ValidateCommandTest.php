@@ -76,7 +76,7 @@ it('fails when a configured binary cannot be run', function () {
 
 it('fails when a binary path is not configured', function () {
     fakeApi([fakeServer()]);
-    config(['binarylane.wget_binary' => null]);
+    config(['blbackup.wget_binary' => null]);
 
     [$exit, $output] = validate();
 
@@ -130,7 +130,7 @@ it('fails rather than crashing when the remote does not answer in time', functio
 
 it('skips the remote when none is configured, without failing', function () {
     fakeApi([fakeServer()]);
-    config(['binarylane.rclone.remote' => null]);
+    config(['blbackup.rclone.remote' => null]);
 
     [$exit, $output] = validate();
 
@@ -225,7 +225,7 @@ it('fails when the api rejects the token', function () {
 
 it('fails when no api token is configured', function () {
     fakeApi([fakeServer()]);
-    config(['binarylane.api_token' => null]);
+    config(['blbackup.api_token' => null]);
 
     [$exit, $output] = validate();
 
@@ -268,8 +268,8 @@ it('warns when it cannot tell what version it is', function () {
 it('reports the configured server lists and how many servers they name', function () {
     fakeApi([fakeServer()]);
     config([
-        'binarylane.include_file' => writeServerList('include.txt', ['web1.example.com']),
-        'binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com', 'db2.example.com']),
+        'blbackup.include_file' => writeServerList('include.txt', ['web1.example.com']),
+        'blbackup.exclude_file' => writeServerList('exclude.txt', ['db1.example.com', 'db2.example.com']),
     ]);
 
     [$exit, $output] = validate(['--no-api' => true]);
@@ -293,7 +293,7 @@ it('reports an unset server list as a skip rather than a pass', function () {
 
 it('fails when a configured server list cannot be read', function () {
     fakeApi([fakeServer()]);
-    config(['binarylane.exclude_file' => '/no/such/list.txt']);
+    config(['blbackup.exclude_file' => '/no/such/list.txt']);
 
     [$exit, $output] = validate(['--no-api' => true]);
 
@@ -304,7 +304,7 @@ it('fails when a configured server list cannot be read', function () {
 
 it('warns when a configured server list names no servers', function () {
     fakeApi([fakeServer()]);
-    config(['binarylane.exclude_file' => writeServerList('empty.txt', [])]);
+    config(['blbackup.exclude_file' => writeServerList('empty.txt', [])]);
 
     [$exit, $output] = validate(['--no-api' => true]);
 
@@ -475,7 +475,7 @@ it('sends nothing whose only proof is somebody seeing it with --unattended', fun
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
+    config(['blbackup.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     Log::spy();
@@ -501,7 +501,7 @@ it('still records its own warnings and failures with --unattended', function () 
     config([
         'logging.default' => 'single',
         'logging.channels.single.path' => storage_path('probe.log'),
-        'binarylane.timezone' => 'Mars/Olympus_Mons',
+        'blbackup.timezone' => 'Mars/Olympus_Mons',
     ]);
 
     Log::spy();
@@ -588,7 +588,7 @@ it('makes no call that leaves the machine with --offline', function () {
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
+    config(['blbackup.summary.slack_webhook' => 'https://hooks.slack.test/abc']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     Log::spy();
@@ -735,7 +735,7 @@ it('counts the run summary in when it shares the log webhook', function () {
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/services/SHARED']);
+    config(['blbackup.summary.slack_webhook' => 'https://hooks.slack.test/services/SHARED']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     [$exit, $output] = validate();
@@ -754,7 +754,7 @@ it('does not count it in when the two point somewhere different', function () {
 
     $sent = [];
     recordingSlack($sent);
-    config(['binarylane.summary.slack_webhook' => 'https://hooks.slack.test/services/SUMMARY']);
+    config(['blbackup.summary.slack_webhook' => 'https://hooks.slack.test/services/SUMMARY']);
     app()->forgetInstance(App\Support\SlackSummary::class);
 
     [$exit, $output] = validate();

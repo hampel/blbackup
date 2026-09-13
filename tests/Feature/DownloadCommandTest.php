@@ -287,7 +287,7 @@ it('takes the exclude list from configuration when no option is given', function
     fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
     fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
 
-    config(['binarylane.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
+    config(['blbackup.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
 
     $this->artisan('download', ['--all' => true])->assertSuccessful();
 

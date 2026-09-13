@@ -191,7 +191,7 @@ class Api
         {
             return Http::sink($path)
                 ->withOptions(['progress' => $progress])
-                ->timeout(config('binarylane.timeout'))
+                ->timeout(config('blbackup.timeout'))
                 ->retry(3, 100)
                 ->get($url)
                 ->throw();

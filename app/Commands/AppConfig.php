@@ -54,20 +54,20 @@ class AppConfig extends Command
                 'Laravel Version' => $this->app::VERSION,
                 'PHP Version' => phpversion(),
                 'Environment' => $this->laravel->environment(),
-                'Timezone' => config('binarylane.timezone'),
+                'Timezone' => config('blbackup.timezone'),
             ],
 
             'BinaryLane' => [
-                'API Token' => $this->secretStatus(config('binarylane.api_token')),
-                'API Timeout' => (string) config('binarylane.timeout'),
-                'Keep Only Days' => (string) config('binarylane.keeponly_days'),
-                'Include File' => $this->optionalPath(config('binarylane.include_file')),
-                'Exclude File' => $this->optionalPath(config('binarylane.exclude_file')),
+                'API Token' => $this->secretStatus(config('blbackup.api_token')),
+                'API Timeout' => (string) config('blbackup.timeout'),
+                'Keep Only Days' => (string) config('blbackup.keeponly_days'),
+                'Include File' => $this->optionalPath(config('blbackup.include_file')),
+                'Exclude File' => $this->optionalPath(config('blbackup.exclude_file')),
                 'Lock File' => $this->path(app(BackupLock::class)->path()),
-                'zstd Binary' => $this->path(config('binarylane.zstd_binary')),
-                'wget Binary' => $this->path(config('binarylane.wget_binary')),
-                'rclone Binary' => $this->path(config('binarylane.rclone.binary')),
-                'rclone Remote' => $this->required(config('binarylane.rclone.remote')),
+                'zstd Binary' => $this->path(config('blbackup.zstd_binary')),
+                'wget Binary' => $this->path(config('blbackup.wget_binary')),
+                'rclone Binary' => $this->path(config('blbackup.rclone.binary')),
+                'rclone Remote' => $this->required(config('blbackup.rclone.remote')),
             ],
 
             'Filesystems' => [
@@ -91,8 +91,8 @@ class AppConfig extends Command
             ],
 
             'Run summary' => [
-                'Slack Webhook' => $this->secretStatus(config('binarylane.summary.slack_webhook')),
-                'Notify' => config('binarylane.summary.notify'),
+                'Slack Webhook' => $this->secretStatus(config('blbackup.summary.slack_webhook')),
+                'Notify' => config('blbackup.summary.notify'),
             ],
         ], $this->option('only'));
 
