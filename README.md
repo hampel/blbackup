@@ -1,4 +1,4 @@
-# blbackup
+# blbackup - BinaryLane VPS Backup CLI
 
 [![ci](https://github.com/hampel/blbackup/actions/workflows/ci.yml/badge.svg)](https://github.com/hampel/blbackup/actions/workflows/ci.yml)
 
