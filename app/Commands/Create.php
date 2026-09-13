@@ -183,6 +183,11 @@ class Create extends BaseCommand
         // rather than handing back a status to compare
         $outcome = 'completed';
 
+        // why, when the client said. It logs nothing above debug as of 0.3.0, so the
+        // record written below is the only place the reason survives - an errored
+        // action's own explanation, the invoice a blocked one is waiting on
+        $reason = null;
+
         try
         {
             $this->binarylane->actions()->await(
@@ -219,18 +224,21 @@ class Create extends BaseCommand
         catch (ActionFailedException $e)
         {
             $outcome = 'errored';
+            $reason = $e->getMessage();
         }
         catch (ActionBlockedException $e)
         {
             // waiting on an answer or an unpaid invoice, and neither arrives by
             // waiting longer - so it is reported now rather than at the timeout
             $outcome = 'blocked';
+            $reason = $e->getMessage();
         }
         catch (MalformedResponseException $e)
         {
             // a status the client cannot classify. The run stops waiting on it, as
             // it always has for a status that was not one it knew
             $outcome = 'unrecognised';
+            $reason = $e->getMessage();
         }
 
         if ($outcome === 'completed')
@@ -261,7 +269,7 @@ class Create extends BaseCommand
                 'error',
                 "Error backing up {$server->name} - status: {$outcome}",
                 "Error backing up server",
-                ['server' => $server->name, 'server_id' => $server->id, 'status' => $outcome, 'disk_size' => $server->disk]
+                ['server' => $server->name, 'server_id' => $server->id, 'status' => $outcome, 'reason' => $reason, 'disk_size' => $server->disk]
             );
 
             $this->summary->recordFailure($server->name, 'create', "backup {$outcome}");

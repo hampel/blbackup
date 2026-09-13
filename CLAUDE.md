@@ -107,15 +107,19 @@ whole command, logs and prints them, and returns FAILURE — so command code cal
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
 
-**An API failure writes two error records, not one, and that is the package's
-doing.** The client logs a rejected or unanswered request at `error` before it
-raises, and `BaseCommand` then logs its own — so at `LOG_SLACK_LEVEL=error` one
-failure posts twice. Deduplicating here would mean skipping the command's record
-for the exception types the client already logged, and **that set is irregular**:
-`ApiException` and `RequestException` are logged, `MalformedResponseException`
-raised for a missing envelope key is not, nor is `InvalidArgumentException` or the
-package's own `InvalidConfiguration`. Skipping by type would lose the only record
-of those, silently, so the duplicate stands until the package settles it.
+**This tool's own log record is the only record of an API failure.** As of
+`hampel/binarylane-api` 0.3.0 the client logs nothing above `debug`, so a failure
+that is caught and not logged here is not logged anywhere. `BaseCommand` logs what
+it catches; `create` catches the action exceptions itself, so it copies each one's
+message into the record as `reason` — an errored action's explanation, the invoice
+a blocked one waits on — which a test pins. Anything new that catches a client
+exception has to write its own line.
+
+It was not always so, and the reason the 0.2 behaviour was not simply worked around
+is worth keeping. 0.2.0 logged some failures at `error` before raising them and not
+others, so this tool wrote most API failures twice, and could not skip the logged
+types without silently losing the rest. That was reported to the package and fixed
+there on 2026-09-14.
 
 **`app:validate` is the command to extend when a new dependency on the
 environment appears.** It exercises rather than describes: it runs each
@@ -556,7 +560,7 @@ until you have seen it fail. One mutation survives on purpose and is not worth
 chasing: the download timeout cannot be observed through `Http::fake()`, which
 never times out.
 
-Fourteen things that will catch you out:
+Thirteen things that will catch you out:
 
 - **Anything the suite does not pin, it inherits — and two of those left the
   machine.** `tests/Pest.php` pins the binaries, the remote, the timezone, the
@@ -619,15 +623,6 @@ Fourteen things that will catch you out:
   them cannot both match the same line. Two values on one table row need a
   single `expectsTable()` row instead — which is why the timezone test asserts a
   row rather than two timestamps.
-- **The BinaryLane client keeps the HTTP factory it was built with — so
-  `Http::swap()` does not reach it.** `fakeApi()` swaps in a fresh factory,
-  because `Http::fake()` merges and the first stub wins; a client built before
-  that swap goes on sending through the old one. It answers from the old fakes,
-  or with none there **sends the request for real**, and
-  `Http::preventStrayRequests()` on the new factory does not stop it. Measured on
-  2026-09-13 against a local sink, which received the escaped request. So
-  `fakeApi()` forgets the client and the manager after swapping, and
-  `ApiTest` fails if it stops. Pure `Http::fake()` with no swap is unaffected.
 - **The suite's API host is `https://api.binarylane.test`, which cannot
   resolve**, for the reason the webhook fixtures use `hooks.slack.test`. The fakes
   match on the path, so nothing a test sees changes — until a request escapes

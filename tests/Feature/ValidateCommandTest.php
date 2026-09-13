@@ -768,11 +768,6 @@ it('does not count it in when the two point somewhere different', function () {
 it('reports how many servers the account has, not how many fit on a page', function () {
     // one server on the page and twenty-five on the account: the line used to
     // count the page, so it could never say more than twenty
-    fakeApi([fakeServer()]);
-    Http::swap(new Illuminate\Http\Client\Factory);
-    app()->forgetInstance(Psr\Http\Client\ClientInterface::class);
-    app()->forgetInstance(Hampel\BinaryLane\Api\Laravel\BinaryLaneManager::class);
-
     Http::fake(function ($request) {
         $path = parse_url($request->url(), PHP_URL_PATH);
 

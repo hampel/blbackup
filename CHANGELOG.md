@@ -24,9 +24,8 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **The backup timeout counts the time spent waiting between checks**, not the
   time elapsed, so the time taken by the requests themselves is not charged
   against it.
-- **An API failure is written to the log twice**: once by the API client, and once
-  by the command reporting it. At a Slack log level of `error`, one failure posts
-  two messages.
+- **A backup that fails, is blocked or reports a status that is not recognised is
+  logged with the reason BinaryLane gave**, not only its status.
 
 ### Fixed
 

@@ -335,3 +335,20 @@ it('reports a backup that was accepted with no action to follow', function () {
         ->expectsOutputToContain('accepted the backup of web1.example.com but returned no action to follow')
         ->assertFailed();
 });
+
+it('records why a backup failed, since the client no longer does', function () {
+    // binarylane-api 0.3.0 logs nothing above debug, so the reason BinaryLane gave
+    // is lost unless this command's own record carries it
+    fakeApi([$this->server], statuses: [array_merge(fakeAction('errored', 40), ['result_data' => 'disk quota exceeded'])]);
+
+    Illuminate\Support\Facades\Log::spy();
+
+    $this->artisan('create', ['server' => 'web1.example.com'])->assertFailed();
+
+    Illuminate\Support\Facades\Log::shouldHaveReceived('log')->withArgs(
+        fn ($level, $message, $context) => $level === 'error'
+            && $message === 'Error backing up server'
+            && is_string($context['reason'] ?? null)
+            && $context['reason'] !== ''
+    );
+});

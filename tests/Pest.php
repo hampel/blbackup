@@ -44,7 +44,8 @@ uses(Tests\TestCase::class)
             // hooks.slack.test. The fakes match on the request path, so this changes
             // nothing a test can see - until a request escapes them, when it fails
             // on DNS instead of reaching the real API carrying that token. Escaping
-            // is not hypothetical: see fakeApi()
+            // is not hypothetical: before binarylane-api-laravel 0.3.0 a client
+            // built before Http::swap() went on sending for real - see ApiTest
             'binarylane.base_uri' => 'https://api.binarylane.test',
 
             'blbackup.timeout' => 3600,
@@ -201,15 +202,6 @@ function fakeApi(array $servers, array $backups = [], array $links = [], array $
     // would be shadowed by the first. Start from a clean factory instead.
     Http::swap(new Illuminate\Http\Client\Factory);
     Http::preventStrayRequests();
-
-    // THE BINARYLANE CLIENT KEEPS THE HTTP FACTORY IT WAS BUILT WITH, so one built
-    // before the swap above goes on sending through the old factory: it answers
-    // from the old fakes, or with none there sends the request for real - and
-    // preventStrayRequests() on the new factory does not stop it. Measured, not
-    // assumed. Forgetting both singletons makes the next use rebuild against the
-    // factory just swapped in.
-    app()->forgetInstance(Psr\Http\Client\ClientInterface::class);
-    app()->forgetInstance(Hampel\BinaryLane\Api\Laravel\BinaryLaneManager::class);
 
     $statuses = collect($statuses ?: [fakeAction()]);
     $account = $account ?: fakeAccount();

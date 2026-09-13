@@ -36,10 +36,11 @@ it('applies the configured timezone as the default', function () {
 });
 
 it('fakes a client that was built before the fakes were swapped', function () {
-    // the client keeps the HTTP factory it was built with, and fakeApi() swaps in a
-    // new one. Without fakeApi() forgetting the client, the second answer below is
-    // still the first - and with no fake left on the old factory the request goes
-    // out for real, past preventStrayRequests()
+    // fakeApi() swaps in a new HTTP factory each time. Before binarylane-api-laravel
+    // 0.3.0 the client kept the factory it was built with, so the second answer
+    // below was still the first - and with no fake left on the old factory, the
+    // request went out for real, past preventStrayRequests(). 0.3.0 resolves the
+    // factory on every send; this is the test that it still does
     fakeApi([fakeServer(['name' => 'first.example.com'])]);
 
     expect(app(BinaryLaneManager::class)->servers()->list()->items[0]->name)->toBe('first.example.com');
