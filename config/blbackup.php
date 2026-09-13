@@ -4,14 +4,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | API Key
-    |--------------------------------------------------------------------------
-    */
-
-    'api_token' => env('BINARYLANE_API_TOKEN'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Version
     |--------------------------------------------------------------------------
     |
@@ -41,7 +33,13 @@ return [
     | Timeout
     |--------------------------------------------------------------------------
     |
-    | Maximum time in seconds to wait for downloads to complete
+    | Maximum time in seconds to wait for a download to complete, and for a
+    | backup to finish being taken.
+    |
+    | Not the API timeout. One request to the API is bounded separately, by the
+    | client package's BINARYLANE_TIMEOUT - which is why this setting no longer
+    | lives under the `binarylane` config key the package merges its own
+    | `timeout` into.
     */
 
     'timeout' => env('DOWNLOAD_TIMEOUT', 3600),

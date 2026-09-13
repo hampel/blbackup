@@ -24,11 +24,15 @@ it('shows an account that is not active', function () {
 });
 
 it('fails when the token is rejected', function () {
-    Http::fake(['*' => Http::response(['error' => 'unauthorized'], 401)]);
+    // an empty body, which is what BinaryLane really sends with a 401 - and what
+    // gives the client's message something to say about the token
+    Http::fake(['*' => Http::response('', 401)]);
 
-    // BaseCommand turns the API's RequestException into a reported failure
-    // rather than a stack trace - this is the only test that covers it
+    // BaseCommand turns the client's exception into a reported failure rather
+    // than a stack trace - this is the only test that covers it
     $this->artisan('account')
-        ->expectsOutputToContain('Could not fetch account information [401]')
+        // one expectation: both halves are on the same line, and each
+        // expectsOutputToContain() consumes a line
+        ->expectsOutputToContain('(HTTP 401): the API token was missing, malformed, expired or revoked')
         ->assertFailed();
 });

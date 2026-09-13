@@ -55,6 +55,11 @@ return [
 
     'providers' => [
         App\Providers\AppServiceProvider::class,
+
+        // Laravel Zero does not run package discovery, so this has to be named
+        // here: unlisted, nothing registers the BinaryLane client, and every
+        // command that touches the API fails to resolve one
+        Hampel\BinaryLane\Api\Laravel\BinaryLaneServiceProvider::class,
     ],
 
 ];

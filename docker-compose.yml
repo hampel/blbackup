@@ -65,7 +65,7 @@ services:
       # host directory behind it. A path that is not under a mount is written
       # into the container and lost when it exits - and if the directory cannot
       # be written at all, every command dies on its first API call, because
-      # App\Api logs every call.
+      # the API client logs every request.
       - type: bind
         source: "${HOST_LOG_PATH:?set HOST_LOG_PATH in .env to the host directory for logs}"
         target: /logs

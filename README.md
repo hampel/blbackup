@@ -15,7 +15,7 @@ against one server or all of them, and the whole night's work is a single
 ## Requirements
 
 - PHP 8.3 or later, with the CLI SAPI and `ext-intl`
-- A BinaryLane API token with permission to take server backups
+- A BinaryLane API token
 - [`wget`](https://www.gnu.org/software/wget/) to download images
 - [`zstd`](https://facebook.github.io/zstd/) to verify them
 - [rclone](https://rclone.org/) with a configured remote, if the images are to
@@ -131,7 +131,8 @@ is the way to check a `.env` took effect.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `BINARYLANE_API_TOKEN` | — | **Required.** Needs read access plus permission to take backups |
+| `BINARYLANE_API_TOKEN` | — | **Required.** BinaryLane tokens are not scoped: this one can do anything the account can |
+| `BINARYLANE_TIMEOUT` / `BINARYLANE_CONNECT_TIMEOUT` | `10` / `5` | Seconds one API request may take. Not a download or a backup |
 | `APP_TIMEZONE` | `UTC` | Datestamps in filenames, local-time columns, log records |
 | `DOWNLOAD_PATH` | `storage/backups` | Where images land |
 | `DOWNLOAD_TIMEOUT` | `3600` | Seconds to wait for a backup to be taken |

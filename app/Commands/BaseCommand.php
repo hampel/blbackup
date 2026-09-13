@@ -1,12 +1,14 @@
 <?php namespace App\Commands;
 
-use App\Api;
-use App\Exceptions\BinaryLaneException;
+use App\Exceptions\DownloadFailed;
 use App\Support\BackupLock;
 use App\Support\LocksBackups;
 use App\Support\RunSummary;
 use App\Support\SlackSummary;
-use Illuminate\Http\Client\ConnectionException;
+use Hampel\BinaryLane\Api\Entity\ImageDownload;
+use Hampel\BinaryLane\Api\Entity\Server;
+use Hampel\BinaryLane\Api\Exception\ExceptionInterface as BinaryLaneFailure;
+use Hampel\BinaryLane\Api\Laravel\BinaryLaneManager;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
@@ -22,7 +24,15 @@ abstract class BaseCommand extends Command
 
     protected string $commandContext;
 
-    protected Api $api;
+    /**
+     * The BinaryLane client, reached through the manager rather than built here.
+     *
+     * Building a client refuses an account with no token, and check, move and
+     * clean never call the API - so resolving one up front would make those
+     * three need a token they have no use for. The manager builds the client on
+     * the first call that needs it.
+     */
+    protected BinaryLaneManager $binarylane;
 
     protected RunSummary $summary;
 
@@ -56,7 +66,7 @@ abstract class BaseCommand extends Command
             $this->setCommandContext($this->commandContext);
         }
 
-        $this->api = $this->app->make(Api::class);
+        $this->binarylane = $this->app->make(BinaryLaneManager::class);
         $this->summary = $this->app->make(RunSummary::class);
 
         if ($this->summarises)
@@ -84,7 +94,10 @@ abstract class BaseCommand extends Command
             {
                 $status = parent::execute($input, $output);
             }
-            catch (BinaryLaneException | ConnectionException $e)
+            // every failure the API client raises implements its ExceptionInterface
+            // - a rejected request, one that never got an answer, and a malformed
+            // answer alike - so this one catch covers them all
+            catch (BinaryLaneFailure | DownloadFailed $e)
             {
                 Log::error($e->getMessage());
                 $this->components->error($e->getMessage());
@@ -238,6 +251,50 @@ abstract class BaseCommand extends Command
         $names = array_values(array_filter(array_map('trim', explode(PHP_EOL, File::get($path)))));
 
         return $names === [] ? null : $names;
+    }
+
+    /**
+     * Every server on the account, across every page.
+     *
+     * Walked with each() rather than read from one list() call, and that is the
+     * point of it. The API pages at twenty unless asked otherwise, so a single
+     * request answers with the first twenty servers and says nothing about the
+     * rest. Until this tool moved onto the client package that single request was
+     * all `--all` ever made, so an account's twenty-first server would have been
+     * left out of every run without a word.
+     *
+     * @return list<Server>
+     */
+    protected function allServers() : array
+    {
+        return iterator_to_array($this->binarylane->servers()->each(), false);
+    }
+
+    /**
+     * The servers matching a hostname - one page of them, which a hostname
+     * filter does not come close to filling.
+     *
+     * @return list<Server>
+     */
+    protected function serversNamed(string $hostname) : array
+    {
+        return $this->binarylane->servers()->list(hostname: $hostname)->items;
+    }
+
+    /**
+     * The compressed download URL for an image's first disk, or null when there
+     * is none.
+     *
+     * The compressed URL and nothing else. The disk's own url() falls back to the
+     * raw image when there is no compressed one, and a raw disk saved as .zst
+     * fails `zstd --test` and is deleted - after the whole disk has been
+     * transferred. A missing URL is reported instead, before any of that.
+     */
+    protected function compressedUrl(ImageDownload $link) : ?string
+    {
+        $url = ($link->disks[0] ?? null)?->compressedUrl ?? '';
+
+        return $url === '' ? null : $url;
     }
 
     protected function log($level, $message, $logMessage = null, $context = [])

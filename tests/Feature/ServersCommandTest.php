@@ -93,6 +93,29 @@ it('reports an API error rather than throwing', function () {
     Http::fake(['*' => Http::response(['error' => 'server error'], 500)]);
 
     $this->artisan('servers')
-        ->expectsOutputToContain('Could not fetch server information')
+        ->expectsOutputToContain('HTTP 500')
         ->assertFailed();
+});
+
+it('lists the servers on every page, not only the first', function () {
+    // BinaryLane pages at twenty. One request used to be all the listing made, so
+    // a server on the second page was left out of `servers` and of every --all run
+    $page1 = fakeServer(['id' => 100, 'name' => 'web1.example.com']);
+    $page2 = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+
+    Http::fake(function ($request) use ($page1, $page2) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return ($query['page'] ?? '1') === '2'
+            ? Http::response(['servers' => [$page2], 'meta' => ['total' => 2]])
+            : Http::response([
+                'servers' => [$page1],
+                'meta' => ['total' => 2],
+                'links' => ['pages' => ['next' => 'https://api.binarylane.test/v2/servers?page=2']],
+            ]);
+    });
+
+    expect(Artisan::call('servers', ['--names' => true]))->toBe(0);
+
+    expect(Artisan::output())->toContain('web1.example.com')->toContain('db1.example.com');
 });

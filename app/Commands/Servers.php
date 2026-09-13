@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use Hampel\BinaryLane\Api\Entity\Server;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Str;
 
@@ -37,13 +38,15 @@ class Servers extends BaseCommand
         if (is_numeric($hostname))
         {
             // $hostname is server_id
-            $server = $this->api->server($hostname);
-
-            $servers[] = $server;
+            $servers = [$this->binarylane->servers()->get((int) $hostname)];
+        }
+        elseif ($hostname)
+        {
+            $servers = $this->serversNamed($hostname);
         }
         else
         {
-            $servers = $this->api->servers($hostname);
+            $servers = $this->allServers();
         }
 
         if (empty($servers))
@@ -55,16 +58,16 @@ class Servers extends BaseCommand
         {
             collect($servers)
                 ->sortBy('id')
-                ->each(function ($server) {
-                    $this->line($server['id']);
+                ->each(function (Server $server) {
+                    $this->line((string) $server->id);
                 });
         }
         elseif ($this->option('names'))
         {
             collect($servers)
                 ->sortBy('name')
-                ->each(function ($server) {
-                    $this->line($server['name']);
+                ->each(function (Server $server) {
+                    $this->line($server->name);
                 });
         }
         else
@@ -73,13 +76,13 @@ class Servers extends BaseCommand
             $this->line("Servers");
             $this->newLine();
 
-            $table = collect($servers)->sortBy('id')->map(function ($server) {
+            $table = collect($servers)->sortBy('id')->map(function (Server $server) {
                 return [
-                    'id' => $server['id'],
-                    'name' => $server['name'],
-                    'memory' => Str::padLeft($server['memory'], 6),
-                    'vcpus' => Str::padLeft($server['vcpus'], 5),
-                    'disk' => Str::padLeft($server['disk'], 4),
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'memory' => Str::padLeft((string) $server->memory, 6),
+                    'vcpus' => Str::padLeft((string) $server->vcpus, 5),
+                    'disk' => Str::padLeft((string) $server->disk, 4),
                 ];
             });
 

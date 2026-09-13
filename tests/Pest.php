@@ -32,7 +32,21 @@ use Illuminate\Support\Facades\Storage;
 uses(Tests\TestCase::class)
     ->beforeEach(function () {
         config([
-            'blbackup.api_token' => 'test-token',
+            // the BinaryLane client reads its token from the package's own config,
+            // which the project .env feeds as readily as anything here - so a
+            // suite that did not pin it would put the developer's real token in
+            // every request it fakes
+            'binarylane.default' => 'main',
+            'binarylane.accounts' => ['main' => ['token' => 'test-token']],
+            'binarylane.per_page' => null,
+
+            // a host that cannot resolve, for the reason the webhook fixtures use
+            // hooks.slack.test. The fakes match on the request path, so this changes
+            // nothing a test can see - until a request escapes them, when it fails
+            // on DNS instead of reaching the real API carrying that token. Escaping
+            // is not hypothetical: see fakeApi()
+            'binarylane.base_uri' => 'https://api.binarylane.test',
+
             'blbackup.timeout' => 3600,
             'blbackup.timezone' => 'Australia/Sydney',
             'blbackup.zstd_binary' => '/usr/bin/zstd',
@@ -173,7 +187,7 @@ function putDownload(string $path, int $bytes): void
 */
 
 /**
- * Answer the BinaryLane endpoints App\Api calls, routing on the request path
+ * Answer the BinaryLane endpoints the commands call, routing on the request path
  * so one fake covers every command.
  *
  * $statuses is the queue of action payloads GET /actions/{id} returns as the
@@ -186,6 +200,16 @@ function fakeApi(array $servers, array $backups = [], array $links = [], array $
     // Http::fake() merges stubs and the first match wins, so a second call
     // would be shadowed by the first. Start from a clean factory instead.
     Http::swap(new Illuminate\Http\Client\Factory);
+    Http::preventStrayRequests();
+
+    // THE BINARYLANE CLIENT KEEPS THE HTTP FACTORY IT WAS BUILT WITH, so one built
+    // before the swap above goes on sending through the old factory: it answers
+    // from the old fakes, or with none there sends the request for real - and
+    // preventStrayRequests() on the new factory does not stop it. Measured, not
+    // assumed. Forgetting both singletons makes the next use rebuild against the
+    // factory just swapped in.
+    app()->forgetInstance(Psr\Http\Client\ClientInterface::class);
+    app()->forgetInstance(Hampel\BinaryLane\Api\Laravel\BinaryLaneManager::class);
 
     $statuses = collect($statuses ?: [fakeAction()]);
     $account = $account ?: fakeAccount();
@@ -197,26 +221,55 @@ function fakeApi(array $servers, array $backups = [], array $links = [], array $
             // Http::fake honours the sink option, so the --no-wget path writes a
             // real file of exactly the size the API below reports
             str_ends_with($path, '.zst') => Http::response(str_repeat('x', MEGABYTE)),
-            str_ends_with($path, '/backups') => Http::response(['backups' => $backups]),
+            str_ends_with($path, '/backups') => Http::response(fakeCollection('backups', $backups, $request)),
             str_ends_with($path, '/account') => Http::response(['account' => $account]),
-            str_ends_with($path, '/images') => Http::response(['images' => $backups]),
+            str_ends_with($path, '/images') => Http::response(fakeCollection('images', $backups, $request)),
             str_ends_with($path, '/actions') => Http::response(['action' => fakeAction('in-progress', 0)]),
             (bool) preg_match('#/actions/\d+$#', $path) => Http::response(
                 ['action' => value($statuses->count() > 1 ? $statuses->shift() : $statuses->first())]
             ),
+            // an image with nothing to download answers with no disks, which is what
+            // the command reports as "no download link" - not a null, which the
+            // client rightly refuses as a malformed answer
             (bool) preg_match('#/images/(\d+)/download$#', $path, $matches) => Http::response(
-                ['link' => $links[(int) $matches[1]] ?? null]
+                ['link' => $links[(int) $matches[1]] ?? ['id' => (int) $matches[1], 'disks' => []]]
             ),
-            (bool) preg_match('#/images/(\d+)$#', $path, $matches) => Http::response(
-                ['image' => collect($backups)->firstWhere('id', (int) $matches[1])]
+            (bool) preg_match('#/images/(\d+)$#', $path, $matches) => fakeFound(
+                'image', collect($backups)->firstWhere('id', (int) $matches[1])
             ),
-            (bool) preg_match('#/servers/(\d+)$#', $path, $matches) => Http::response(
-                ['server' => collect($servers)->firstWhere('id', (int) $matches[1])]
+            (bool) preg_match('#/servers/(\d+)$#', $path, $matches) => fakeFound(
+                'server', collect($servers)->firstWhere('id', (int) $matches[1])
             ),
-            str_ends_with($path, '/servers') => Http::response(['servers' => $servers]),
+            str_ends_with($path, '/servers') => Http::response(fakeCollection('servers', $servers, $request)),
             default => Http::response(['error' => "unexpected request to {$path}"], 404),
         };
     });
+}
+
+/**
+ * A list answer the way the API gives one: the items, and meta.total across every
+ * page. A per_page of 0 is the API's count-only request, so it gets the total and
+ * no items - which is what makes a count that quietly fell back to counting one
+ * page of a listing show up as the wrong number.
+ */
+function fakeCollection(string $key, array $items, Request $request): array
+{
+    parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+    $countOnly = isset($query['per_page']) && (int) $query['per_page'] === 0;
+
+    return [$key => $countOnly ? [] : array_values($items), 'meta' => ['total' => count($items)]];
+}
+
+/**
+ * One object, or the 404 the API answers with when there is no such thing - which
+ * the client raises as NotFoundException rather than handing back an empty result.
+ */
+function fakeFound(string $key, ?array $object)
+{
+    return $object === null
+        ? Http::response(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404], 404)
+        : Http::response([$key => $object]);
 }
 
 function fakeLink(int $image, string $url): array

@@ -2,8 +2,11 @@
 
 namespace App\Commands;
 
-use Carbon\Carbon;
+use App\Support\ImageDownloader;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
+use Hampel\BinaryLane\Api\Entity\Image;
+use Hampel\BinaryLane\Api\Entity\Server;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
@@ -48,36 +51,36 @@ class Download extends BaseCommand
 
         if ($imageId)
         {
-            $link = $this->api->link($imageId);
+            // an id that is not a backup on this account raises rather than
+            // answering empty, and BaseCommand reports it
+            $imageId = (int) $imageId;
 
-            if (empty($link))
+            $url = $this->compressedUrl($this->binarylane->images()->download($imageId));
+
+            if ($url === null)
             {
                 $this->fail("No download link found for image {$imageId}");
             }
 
-            $image = $this->api->image($imageId);
+            $image = $this->binarylane->images()->get($imageId);
 
-            if (empty($image))
+            $serverId = $image->backupInfo?->serverId;
+
+            if (empty($serverId))
             {
-                $this->fail("No image data returned for image {$imageId}");
+                $this->fail("Image {$imageId} is not the backup of a server");
             }
 
-            $serverId = $image['backup_info']['server_id'];
-            $server = $this->api->server($serverId);
+            $server = $this->binarylane->servers()->get($serverId);
 
-            if (empty($server))
-            {
-                $this->fail("Could not find server {$serverId} for image {$imageId}");
-            }
-
-            return $this->downloadImage($image, $server, $link) ? self::SUCCESS : self::FAILURE;
+            return $this->downloadImage($image, $server, $url) ? self::SUCCESS : self::FAILURE;
         }
 
         $hostnameOrServerId = $this->argument('server');
 
         if ($this->option('all'))
         {
-            $servers = $this->api->servers();
+            $servers = $this->allServers();
 
             if (empty($servers)) {
                 $this->fail("No server data returned for {$hostnameOrServerId}");
@@ -92,17 +95,11 @@ class Download extends BaseCommand
         }
         elseif (is_numeric($hostnameOrServerId))
         {
-            $server = $this->api->server($hostnameOrServerId);
-
-            if (empty($server)) {
-                $this->fail("Could not find server {$hostnameOrServerId}");
-            }
-
-            $servers[] = $server;
+            $servers = [$this->binarylane->servers()->get((int) $hostnameOrServerId)];
         }
         else
         {
-            $servers = $this->api->servers($hostnameOrServerId);
+            $servers = $this->serversNamed($hostnameOrServerId);
 
             if (empty($servers)) {
                 $this->fail("No server data returned for {$hostnameOrServerId}");
@@ -113,50 +110,52 @@ class Download extends BaseCommand
         $excludeServers = $this->serverList('exclude');
 
         $failed = collect($servers)
-            ->filter(function ($server) use ($includeServers) {
-                return $includeServers ? in_array($server['name'], $includeServers) : true;
+            ->filter(function (Server $server) use ($includeServers) {
+                return $includeServers ? in_array($server->name, $includeServers) : true;
             })
-            ->reject(function ($server) use ($excludeServers) {
-                return $excludeServers ? in_array($server['name'], $excludeServers) : false;
+            ->reject(function (Server $server) use ($excludeServers) {
+                return $excludeServers ? in_array($server->name, $excludeServers) : false;
             })
             // reject rather than each, so one server that fails doesn't stop the
             // run and what is left is the servers with no backup in place
-            ->reject(function ($server) {
+            ->reject(function (Server $server) {
 
-                $backups = $this->api->backups($server);
+                // every page - a server's backups rarely fill one, but a first page
+                // that stopped short would quietly download an older image
+                $backups = iterator_to_array($this->binarylane->servers()->eachBackup($server->id), false);
 
                 if (empty($backups))
                 {
                     $this->log(
                         'warning',
-                        "No backup data returned for {$server['name']}",
+                        "No backup data returned for {$server->name}",
                         "No backup data returned",
-                        ['server' => $server['name']]
+                        ['server' => $server->name]
                     );
 
-                    $this->summary->recordFailure($server['name'], 'download', 'no backup data returned');
+                    $this->summary->recordFailure($server->name, 'download', 'no backup data returned');
 
                     return false;
                 }
 
-                $image = collect($backups)->sortBy('created_at')->last();
-                $imageId = $image['id'];
+                $image = collect($backups)->sortBy(fn (Image $backup) => $backup->createdAt)->last();
+                $imageId = $image->id;
 
-                $link = $this->api->link($imageId);
+                $url = $this->compressedUrl($this->binarylane->images()->download($imageId));
 
-                if (empty($link))
+                if ($url === null)
                 {
                     $this->log(
                         'warning',
-                        "No download link found for {$server['name']} image {$imageId}",
+                        "No download link found for {$server->name} image {$imageId}",
                         "No download link found",
-                        ['image_id' => $imageId, 'server' => $server['name']]
+                        ['image_id' => $imageId, 'server' => $server->name]
                     );
 
                     return false;
                 }
 
-                return $this->downloadImage($image, $server, $link);
+                return $this->downloadImage($image, $server, $url);
             });
 
         if ($failed->isNotEmpty())
@@ -180,29 +179,43 @@ class Download extends BaseCommand
      * went wrong. Callers use it for the exit code, so a skip must not read as
      * a failure.
      */
-    protected function downloadImage(array $image, array $server, array $link) : bool
+    protected function downloadImage(Image $image, Server $server, string $url) : bool
     {
-        $date = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at'])
+        if ($image->createdAt === null)
+        {
+            // the filename is built from it, and so are the already-downloaded
+            // check and clean's expiry - an image without one cannot be placed
+            $this->log(
+                'error',
+                "Backup image {$image->id} for {$server->name} has no creation date to name the download by",
+                "Backup image has no creation date",
+                ['image_id' => $image->id, 'server' => $server->name]
+            );
+
+            return false;
+        }
+
+        $date = CarbonImmutable::instance($image->createdAt)
             ->setTimezone(config('blbackup.timezone'))
             ->format("Ymd-His");
 
-        if (!Storage::disk('downloads')->exists($server['name']))
+        if (!Storage::disk('downloads')->exists($server->name))
         {
             $this->log(
                 'info',
-                "Download path does not exist for {$server['name']}, creating",
+                "Download path does not exist for {$server->name}, creating",
                 "Download path does not exist, creating",
-                ['server' => $server['name']]
+                ['server' => $server->name]
             );
 
-            Storage::disk('downloads')->makeDirectory($server['name']);
+            Storage::disk('downloads')->makeDirectory($server->name);
         }
 
-        $serverName = collect(explode('.', $server['name']))->first();
+        $serverName = collect(explode('.', $server->name))->first();
 
-        $path = "{$server['name']}/backup-{$serverName}-{$date}-{$image['id']}.zst";
+        $path = "{$server->name}/backup-{$serverName}-{$date}-{$image->id}.zst";
 
-        $expectedSize = $image['size_gigabytes'];
+        $expectedSize = $image->sizeGigabytes;
 
         if (!$this->option('force'))
         {
@@ -219,9 +232,9 @@ class Download extends BaseCommand
 
                     $this->log(
                         'notice',
-                        "Backup file for {$server['name']} already exists at [{$path}], use the --force flag to over-ride",
+                        "Backup file for {$server->name} already exists at [{$path}], use the --force flag to over-ride",
                         "Backup file already exists, aborting",
-                        ['server' => $server['name'], 'path' => $path]
+                        ['server' => $server->name, 'path' => $path]
                     );
 
                     // nothing to do, and nothing wrong: the backup is here
@@ -231,9 +244,9 @@ class Download extends BaseCommand
                 // file already exists, but size doesn't match expected - incomplete download?
                 $this->log(
                     'warning',
-                    "Backup file for {$server['name']} already exists at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                    "Backup file for {$server->name} already exists at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
                     "Existing file already exists, but size does not match expected",
-                    ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                    ['server' => $server->name, 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
                 );
 
                 return false;
@@ -255,9 +268,9 @@ class Download extends BaseCommand
 
                         $this->log(
                             'notice',
-                            "Backup file for {$server['name']} already exists on remote at [{$path}], use the --force flag to over-ride",
+                            "Backup file for {$server->name} already exists on remote at [{$path}], use the --force flag to over-ride",
                             "Backup file already exists on remote, aborting",
-                            ['server' => $server['name'], 'path' => $path]
+                            ['server' => $server->name, 'path' => $path]
                         );
 
                         // nothing to do, and nothing wrong: the backup is shipped
@@ -267,9 +280,9 @@ class Download extends BaseCommand
                     // file already exists, but size doesn't match expected - incomplete download?
                     $this->log(
                         'warning',
-                        "Backup file for {$server['name']} already exists on remote at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
+                        "Backup file for {$server->name} already exists on remote at [{$path}], but size {$sizeGb} GB does not match expected {$expectedSize} GB, consider re-downloading using --force parameter",
                         "Existing file already exists on remote, but size does not match expected",
-                        ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                        ['server' => $server->name, 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
                     );
 
                     return false;
@@ -277,13 +290,11 @@ class Download extends BaseCommand
             }
         }
 
-        $url = $link['disks'][0]['compressed_url'];
-
         $this->log(
             'notice',
-            "Downloading {$server['name']} image from [{$url}] to [{$path}]",
+            "Downloading {$server->name} image from [{$url}] to [{$path}]",
             "Downloading image",
-            ['server' => $server['name'], 'url' => $url, 'path' => $path]
+            ['server' => $server->name, 'url' => $url, 'path' => $path]
         );
 
         $fullPath = Storage::disk('downloads')->path($path);
@@ -314,9 +325,9 @@ class Download extends BaseCommand
         $this->newLine();
         $this->log(
             'notice',
-            "Completed download for {$server['name']} in {$elapsed} ({$speed} MB/s)",
+            "Completed download for {$server->name} in {$elapsed} ({$speed} MB/s)",
             "Completed download",
-            ['server' => $server['name'], 'elapsed' => $elapsed, 'seconds' => $secondsFormatted, 'megabytes_per_second' => $speed]
+            ['server' => $server->name, 'elapsed' => $elapsed, 'seconds' => $secondsFormatted, 'megabytes_per_second' => $speed]
         );
         $this->newLine();
 
@@ -324,33 +335,33 @@ class Download extends BaseCommand
         {
             $this->log(
                 'warning',
-                "Deleting invalid backup file for {$server['name']} from [{$path}]",
+                "Deleting invalid backup file for {$server->name} from [{$path}]",
                 "Deleting invalid download file",
-                ['server' => $server['name'], 'path' => $path]
+                ['server' => $server->name, 'path' => $path]
             );
 
             Storage::disk('downloads')->delete($path);
 
-            $this->summary->recordFailure($server['name'], 'check', 'failed the zstd test and was deleted');
+            $this->summary->recordFailure($server->name, 'check', 'failed the zstd test and was deleted');
 
             return false;
         }
 
         $size = Storage::disk('downloads')->size($path);
         $sizeGb = $size / (1024 * 1024 * 1024);
-        $expectedSize = $image['size_gigabytes'];
+        $expectedSize = $image->sizeGigabytes;
 
         if ($sizeGb != $expectedSize)
         {
             $this->log(
                 'error',
-                "Downloaded backup file for {$server['name']}, size of {$sizeGb} GB does not match expected {$expectedSize} GB",
+                "Downloaded backup file for {$server->name}, size of {$sizeGb} GB does not match expected {$expectedSize} GB",
                 "Download size does not match expected",
-                ['server' => $server['name'], 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
+                ['server' => $server->name, 'path' => $path, 'size_gb' => $sizeGb, 'expected_size' => $expectedSize]
             );
 
             $this->summary->recordFailure(
-                $server['name'], 'download',
+                $server->name, 'download',
                 "downloaded {$sizeGb} GB, expected {$expectedSize} GB"
             );
 
@@ -361,7 +372,7 @@ class Download extends BaseCommand
 
         $this->line("Successfully downloaded {$sizeFormatted} GB to [{$path}]");
 
-        $this->summary->recordDownload($server['name'], $path, $size);
+        $this->summary->recordDownload($server->name, $path, $size);
 
         if ($this->option('move'))
         {
@@ -381,7 +392,7 @@ class Download extends BaseCommand
         $progress = $this->progressBar();
         $progress->start();
 
-        $this->api->download(
+        $this->app->make(ImageDownloader::class)->download(
             $url,
             $path,
             function ($downloadTotal, $downloadedBytes, $uploadTotal, $uploadedBytes) use ($progress) {

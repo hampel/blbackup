@@ -19,6 +19,13 @@
  * has no business documenting.
  */
 const UNDOCUMENTED = [
+    // the BinaryLane client package's, and meaningless for a tool that uses one
+    // account, walks every page regardless of page size, and talks to BinaryLane's
+    // own API rather than to a recorded fixture or a terminating proxy
+    'BINARYLANE_ACCOUNT',
+    'BINARYLANE_API_URL',
+    'BINARYLANE_PER_PAGE',
+
     'LOG_DEPRECATIONS_CHANNEL',
     'LOG_DEPRECATIONS_TRACE',
     'LOG_PAPERTRAIL_HANDLER',
@@ -32,7 +39,12 @@ function configuredKeys(): array
 {
     $keys = [];
 
-    foreach (glob(base_path('config/*.php')) as $file)
+    // the client package's config too: the application reads it as surely as its
+    // own, merged in by the package's provider rather than living in config/, and
+    // the API token is one of its settings
+    $files = [...glob(base_path('config/*.php')), base_path('vendor/hampel/binarylane-api-laravel/config/binarylane.php')];
+
+    foreach ($files as $file)
     {
         preg_match_all("/env\('([A-Z_]+)'/", file_get_contents($file), $matches);
 

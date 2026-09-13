@@ -39,7 +39,7 @@ php blbackup app:build blbackup  # compile a PHAR into builds/ (box.json)
 ```
 
 `--include` / `--exclude` take a path to a plain-text file, one server hostname
-per line, filtered against `$server['name']`, and default to
+per line, filtered against the server's `name`, and default to
 `blbackup.include_file` / `blbackup.exclude_file` when the option is absent.
 `clean` prompts for confirmation unless `--dry-run` or `--no-interaction`.
 
@@ -73,17 +73,49 @@ the whole run exit non-zero.
 
 ## Architecture
 
-**`App\Api` is the only thing that talks to BinaryLane.** Every method wraps a
-`Http::binarylane()` call (a macro registered in `AppServiceProvider` binding the
-token and `https://api.binarylane.com.au/v2`) and converts a `RequestException`
-into `App\Exceptions\BinaryLaneException`, whose message carries the HTTP status
-and reason. `_ide_helper.php` exists solely to declare that macro.
+**Everything that talks to BinaryLane goes through `hampel/binarylane-api-laravel`.**
+Its provider is listed by hand in `config/app.php`, because Laravel Zero does not
+run package discovery — unlisted, nothing registers the client. Commands reach it
+as `$this->binarylane`, a `BinaryLaneManager` resolved in `BaseCommand::execute()`,
+and get typed entities back (`Server`, `Image`, `Action`, `ImageDownload`) rather
+than arrays. It is the manager and not a built client on purpose: building a
+client refuses an account with no token, and `check`, `move` and `clean` never
+call the API, so they must not need one configured.
 
-**`BaseCommand::execute()` catches `BinaryLaneException` and `ConnectionException`**
-for the whole command, logs and prints them, and returns FAILURE — so command
-code calls `$this->api->…` straight, with no try/catch. Subclasses set
+Three things the package does that this tool used to do badly or not at all:
+
+- **Lists are walked with `each()`, across every page.** The API pages at twenty,
+  and the hand-built client this replaced made one request per list, so `--all`
+  would have silently skipped a twenty-first server and `backups` listed only the
+  backups that sorted into the first page of *all* images. Both were latent when
+  this changed on 2026-09-13 — the account sat below both cliffs — which is exactly
+  how a bug like that survives. `BaseCommand::allServers()` is the walk; a test
+  serves two pages and fails if only the first is read.
+- **`create` waits on a backup with `actions()->await()`,** which raises for an
+  action that failed, one that is blocked on an answer or an unpaid invoice, one
+  whose status it cannot classify, and one that outlives the timeout. The command
+  catches each and reports it in the words the summary has always used —
+  `status: errored`, `in-progress`, `blocked`. The timeout counts **seconds spent
+  waiting, not the wall clock**, so request latency is not charged against it.
+- **Failures are typed.** A 401 and a 404 are different exceptions, a 200 with the
+  wrong body is `MalformedResponseException` rather than an empty result, and
+  every one implements the package's `ExceptionInterface`.
+
+**`BaseCommand::execute()` catches that interface and `DownloadFailed`** for the
+whole command, logs and prints them, and returns FAILURE — so command code calls
+`$this->binarylane->…` straight, with no try/catch. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
+
+**An API failure writes two error records, not one, and that is the package's
+doing.** The client logs a rejected or unanswered request at `error` before it
+raises, and `BaseCommand` then logs its own — so at `LOG_SLACK_LEVEL=error` one
+failure posts twice. Deduplicating here would mean skipping the command's record
+for the exception types the client already logged, and **that set is irregular**:
+`ApiException` and `RequestException` are logged, `MalformedResponseException`
+raised for a missing envelope key is not, nor is `InvalidArgumentException` or the
+package's own `InvalidConfiguration`. Skipping by type would lose the only record
+of those, silently, so the duplicate stands until the package settles it.
 
 **`app:validate` is the command to extend when a new dependency on the
 environment appears.** It exercises rather than describes: it runs each
@@ -126,8 +158,8 @@ Reporting a failure writes to the log, so validating an unwritable log
 destination died inside Monolog until every write from this command was guarded
 and the channel dropped once known bad — `Log::forgetChannels()` cannot do that,
 because closing a stream handler opens the stream that could not be opened.
-And that exposure is not this command's alone: `App\Api` logs every call, so an
-unwritable log path takes any command down on its first API call.
+And that exposure is not this command's alone: the API client logs every
+request, so an unwritable log path takes any command down on its first API call.
 
 **A mistyped command must exit non-zero, and that took an override.**
 `App\Kernel` narrows `LaravelZero\Framework\Kernel::ensureDefaultCommand()` so
@@ -268,9 +300,17 @@ written to the console inside these callbacks except through the progress bar, o
 it breaks the redraw (see the `Log::debug` in `Create::backup()` for the pattern).
 
 **Downloads default to `wget`, not the Http client.** `--no-wget` switches to
-`Api::download()` (Guzzle sink + progress callback), the original implementation.
-`app:validate --download=<url>` exercises that same
-`Api::download()` path against an arbitrary URL.
+`App\Support\ImageDownloader` (Guzzle sink + progress callback), the original
+implementation, and `app:validate --download=<url>` exercises that same path
+against an arbitrary URL. **It is not part of the API client, because it is not an
+API call:** the pre-signed URL carries its own authorisation and points at storage
+rather than at the API. Its failures raise `App\Exceptions\DownloadFailed`.
+
+**Only the compressed URL is ever downloaded.** `BaseCommand::compressedUrl()`
+reads `compressedUrl` and nothing else, where the disk's own `url()` would fall
+back to the raw image. A raw disk saved as `.zst` fails `zstd --test` and is
+deleted — after the whole disk has been transferred — so a disk offering only the
+raw image is reported as having no download link instead.
 
 **Filenames encode the source.** Downloads land at
 `<download disk>/<server name>/backup-<short name>-<Ymd-His>-<image id>.zst`,
@@ -292,12 +332,27 @@ built from `Storage::disk('downloads')->path(…)`.
 
 ## Configuration and packaging
 
-Everything app-specific is env-driven through `config/blbackup.php` — API
-token, download timeout, the three binary paths, `keeponly_days`, the rclone
-remote, and the timezone. Read it through `config()`, never `env()` outside
-`config/`. `.env.example` documents every variable with its default; `.env`
-itself is gitignored, and `app:config` is the way to see what a given install
-resolved to.
+Everything app-specific is env-driven through `config/blbackup.php` — download
+timeout, the three binary paths, `keeponly_days`, the rclone remote, and the
+timezone. Read it through `config()`, never `env()` outside `config/`.
+`.env.example` documents every variable with its default; `.env` itself is
+gitignored, and `app:config` is the way to see what a given install resolved to.
+
+**The API token and the per-request API timeout are the client package's
+settings, under `binarylane.*`** — merged in from its own config file, not
+published into `config/`. Read the token as
+`binarylane.accounts.<default account>.token`, which is what the client sends;
+`app:config` and `app:validate` both do, so neither can report a token as set
+that the client does not see. `EnvExampleTest` scans the package's config file as
+well as `config/`, because the application reads it as surely as its own.
+
+**This application's settings are `blbackup.*`, not `binarylane.*`, and must stay
+that way.** They lived under `binarylane` until the package arrived, and its
+provider merges its defaults into that key with `mergeConfigFrom()` — a shallow
+merge where the application wins, key by key. The two disagree about `timeout`:
+here it is the download and backup-poll ceiling, 3600 seconds; there it bounds one
+API request, at 10. Left merged, every API request would have waited up to an hour
+for an answer, with nothing in either file to say the other reads the same key.
 
 **The version has three sources, and which one answers depends on how it is
 running.** `config/app.php` holds `app('git.version')`, which shells out to
@@ -472,36 +527,36 @@ against the exact wget/zstd/rclone command string, `Http::assertSent()` against
 the request, and the state of the `downloads` disk afterwards.
 
 `tests/Pest.php` pins every binary path, the remote, the timezone and the API
-token in a `beforeEach` chained onto `uses()`, so assertions don't depend on the
-developer's `.env` — it also forces `logging.default` to `null`, since the
+client's account and token in a `beforeEach` chained onto `uses()`, so assertions
+don't depend on the developer's `.env` — it also forces `logging.default` to `null`, since the
 project `.env` is loaded during tests and the suite would otherwise append to
 whatever log the developer has configured. `Storage::fake('downloads')` repoints
 the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /
 `fakeImage()` build API payloads, `fakeApi()` answers every BinaryLane endpoint
-by routing on the request path, `fakeBinaries()` fakes the external commands with
+by routing on the request path — lists with a `meta.total`, a missing server or
+image with the 404 the API really sends — `fakeBinaries()` fakes the external commands with
 a fall-through to success, `wgetWrites()` is a wget fake that writes the file
 wget would have written, `writeServerList()` writes an `--include` / `--exclude`
 list, `putAgedDownload()` writes a backup with a modification time for `clean`
 to expire, `rcloneEntry()` / `rcloneListing()` build `rclone lsjson` output,
 `renderedTable()` parses a printed table back into rows for an exact
 comparison, and `backupPath()` gives the path the command derives for the
-standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads the
-`create` poll loop reads, and an entry may be a closure — which is how a test
+standard fixture. `fakeApi()`'s `$statuses` argument is the queue of action payloads
+`create`'s `await()` reads, and an entry may be a closure — which is how a test
 makes something happen between one poll and the next.
 
 The suite has been audited by mutation: change one behaviour in `app/`, run the
 suite, and a test should fail. 49 mutations were tried across the commands, the
 API client and the service provider; the gaps that found are now covered
 (`download`'s `--include` / `--exclude`, `backups --ids` filtering and its
-per-server form, the `Http::binarylane()` token and base url, the timezone
+per-server form, the token and base url the API client sends, the timezone
 default, and the deliberate working directory each external process runs in).
 Do the same for anything substantial you add — a passing test proves nothing
-until you have seen it fail. Two mutations survive on purpose and are not worth
-chasing: deleting `create`'s `errored` status check changes nothing, because the
-`!== 'in-progress'` check below it catches the same case, and the download
-timeout cannot be observed through `Http::fake()`, which never times out.
+until you have seen it fail. One mutation survives on purpose and is not worth
+chasing: the download timeout cannot be observed through `Http::fake()`, which
+never times out.
 
-Twelve things that will catch you out:
+Fourteen things that will catch you out:
 
 - **Anything the suite does not pin, it inherits — and two of those left the
   machine.** `tests/Pest.php` pins the binaries, the remote, the timezone, the
@@ -564,14 +619,28 @@ Twelve things that will catch you out:
   them cannot both match the same line. Two values on one table row need a
   single `expectsTable()` row instead — which is why the timezone test asserts a
   row rather than two timestamps.
-- **`Sleep::fake()` is useless against `create`'s poll loop, and dangerous.**
-  A faked sleep returns before the `while` loop runs, so the poll callback never
-  executes and `$status` stays null. Sleep is therefore real in
-  `CreateCommandTest`, which is only affordable because a poll that ends the loop
-  never sleeps — the callback runs before the first sleep. Every test there has
-  to reach a stopping condition on its first poll, or it costs ten seconds a
-  poll. The timeout test gets there by having the API fake move the clock, since
-  the elapsed-time check cannot otherwise trip.
+- **The BinaryLane client keeps the HTTP factory it was built with — so
+  `Http::swap()` does not reach it.** `fakeApi()` swaps in a fresh factory,
+  because `Http::fake()` merges and the first stub wins; a client built before
+  that swap goes on sending through the old one. It answers from the old fakes,
+  or with none there **sends the request for real**, and
+  `Http::preventStrayRequests()` on the new factory does not stop it. Measured on
+  2026-09-13 against a local sink, which received the escaped request. So
+  `fakeApi()` forgets the client and the manager after swapping, and
+  `ApiTest` fails if it stops. Pure `Http::fake()` with no swap is unaffected.
+- **The suite's API host is `https://api.binarylane.test`, which cannot
+  resolve**, for the reason the webhook fixtures use `hooks.slack.test`. The fakes
+  match on the path, so nothing a test sees changes — until a request escapes
+  them, when it fails on DNS instead of reaching BinaryLane with the pinned token.
+  Pointing that pin at a local sink for one full run is the check that nothing
+  escapes; on 2026-09-13 it received nothing. `ApiTest` alone sets the host back
+  to the real default, to prove it is BinaryLane's.
+- **`Sleep::fake()` works against `create`, and `CreateCommandTest` fakes it for
+  every test.** `create` hands `await()` a wait that goes through `Sleep`, so a
+  backup still in progress costs no real time. Since `await()` counts the
+  seconds it has waited rather than reading the clock, **moving the clock with
+  `travel()` does nothing** — the timeout test drives it with faked sleeps and
+  asserts the sequence, ten seconds then the five left before the deadline.
 - **`rclone lsjson` emits RFC3339 with nanosecond precision** — and `Z` rather
   than an offset on some backends. `rcloneEntry()` mirrors what the rclone on
   this machine really prints, which is the point: a fixture in a tidier format
@@ -592,7 +661,9 @@ extend the class. Keep new helpers on the contract.
 - The code uses Allman braces and its own spacing, which is **not** Laravel/PSR-12.
   Pint is in `require-dev` but there is no `pint.json`, so running it would
   reformat the entire codebase — don't run it across existing files.
-- There are no Composer scripts; run Pest directly or via `php blbackup test`.
+- `composer test` runs Pest, as do `php vendor/bin/pest` and `php blbackup test`.
+  `composer build` compiles the PHAR without dev dependencies, which is what CI
+  releases from.
 - `phpunit.xml.dist` names both `tests/Unit` and `tests/Feature` as testsuites,
   and Pest exits 2 if either directory is missing — don't leave one empty.
 

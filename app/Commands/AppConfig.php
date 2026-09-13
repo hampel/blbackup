@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Support\BackupLock;
+use Hampel\BinaryLane\Api\Laravel\BinaryLaneManager;
 use Hampel\ConsoleReport\FormatsValues;
 use Hampel\ConsoleReport\ReportsSettings;
 use LaravelZero\Framework\Commands\Command;
@@ -58,8 +59,10 @@ class AppConfig extends Command
             ],
 
             'BinaryLane' => [
-                'API Token' => $this->secretStatus(config('blbackup.api_token')),
-                'API Timeout' => (string) config('blbackup.timeout'),
+                // the default account's token, which is the one the client sends
+                'API Token' => $this->secretStatus(config('binarylane.accounts.' . app(BinaryLaneManager::class)->getDefaultAccount() . '.token')),
+                'API Request Timeout' => (string) config('binarylane.timeout'),
+                'Download Timeout' => (string) config('blbackup.timeout'),
                 'Keep Only Days' => (string) config('blbackup.keeponly_days'),
                 'Include File' => $this->optionalPath(config('blbackup.include_file')),
                 'Exclude File' => $this->optionalPath(config('blbackup.exclude_file')),

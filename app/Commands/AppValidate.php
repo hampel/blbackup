@@ -2,11 +2,12 @@
 
 namespace App\Commands;
 
-use App\Exceptions\BinaryLaneException;
+use App\Exceptions\DownloadFailed;
 use App\Support\BackupLock;
+use App\Support\ImageDownloader;
 use App\Support\SlackSummary;
+use Hampel\BinaryLane\Api\Exception\ExceptionInterface as BinaryLaneFailure;
 use Hampel\ConsoleReport\RendersChecks;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -696,7 +697,11 @@ class AppValidate extends BaseCommand
 
     protected function checkApi() : void
     {
-        if (empty(config('blbackup.api_token')))
+        // the token the client will actually send: the default account's, which is
+        // the only one this tool uses. Read from the client package's config rather
+        // than from a copy of the same environment variable, so this cannot report
+        // a token as set that the client does not see
+        if (empty(config('binarylane.accounts.' . $this->binarylane->getDefaultAccount() . '.token')))
         {
             $this->reportFail("API token", "not configured");
 
@@ -716,15 +721,18 @@ class AppValidate extends BaseCommand
 
         try
         {
-            $account = $this->api->account();
+            $account = $this->binarylane->verify();
 
-            $this->reportOk("BinaryLane account", "{$account['email']} ({$account['status']})");
+            $status = $account->status?->value ?? (string) ($account->raw['status'] ?? 'unknown');
 
-            $servers = $this->api->servers();
+            $this->reportOk("BinaryLane account", "{$account->email} ({$status})");
 
-            $this->reportOk("Servers visible", (string) count($servers));
+            // counted, not listed: a per_page=0 request answers with the total across
+            // every page. This line used to count one page of a listing, so it could
+            // never say more than twenty whatever the account held
+            $this->reportOk("Servers visible", (string) $this->binarylane->servers()->count());
         }
-        catch (BinaryLaneException | ConnectionException $e)
+        catch (BinaryLaneFailure $e)
         {
             $this->reportFail("BinaryLane API", $e->getMessage());
         }
@@ -733,7 +741,7 @@ class AppValidate extends BaseCommand
     /**
      * Take the log out of the run once it is known to be unwritable.
      *
-     * Every command logs - App\Api logs each call - and Monolog throws when it
+     * Every command logs - the API client logs each request - and Monolog throws when it
      * cannot open its file, so without this the checks after this point die
      * with a stack trace instead of reporting. Worth knowing that this is not
      * validate's problem alone: a log path that cannot be written takes any
@@ -814,7 +822,7 @@ class AppValidate extends BaseCommand
 
         try
         {
-            $this->api->download(
+            $this->app->make(ImageDownloader::class)->download(
                 $url,
                 Storage::disk('downloads')->path($path),
                 function ($downloadTotal, $downloadedBytes) use ($progress) {
@@ -828,7 +836,7 @@ class AppValidate extends BaseCommand
             $progress->finish();
             $this->newLine(2);
         }
-        catch (BinaryLaneException | ConnectionException $e)
+        catch (DownloadFailed $e)
         {
             $this->newLine(2);
 

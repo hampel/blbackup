@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ae2395bc4071799212d6fad268c32d98",
+    "content-hash": "89c8e66c42ddba97307b62d96bf4927f",
     "packages": [
         {
             "name": "brick/math",
@@ -908,6 +908,158 @@
                 }
             ],
             "time": "2026-08-24T17:13:02+00:00"
+        },
+        {
+            "name": "hampel/binarylane-api",
+            "version": "0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hampel/binarylane-api.git",
+                "reference": "d953e4b707d488d4312c8b64e7a4bc45cabbb2da"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hampel/binarylane-api/zipball/d953e4b707d488d4312c8b64e7a4bc45cabbb2da",
+                "reference": "d953e4b707d488d4312c8b64e7a4bc45cabbb2da",
+                "shasum": ""
+            },
+            "require": {
+                "ext-ctype": "*",
+                "ext-filter": "*",
+                "ext-json": "*",
+                "php": ">=8.3",
+                "psr/http-client": "^1.0",
+                "psr/http-factory": "^1.0",
+                "psr/http-message": "^1.1|^2.0",
+                "psr/log": "^1.1|^2.0|^3.0"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.8|^8.0",
+                "hampel/rig": "^1.1",
+                "laravel/pint": "^1.30",
+                "phpstan/phpstan": "^2.1.22",
+                "phpunit/phpunit": "^12.0"
+            },
+            "suggest": {
+                "guzzlehttp/guzzle": "A PSR-18 client to send requests with; any implementation will do",
+                "guzzlehttp/psr7": "PSR-17 factories, found automatically when none are passed to Client - as are nyholm/psr7 and laminas/laminas-diactoros"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Hampel\\BinaryLane\\Api\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Simon Hampel",
+                    "email": "simon@hampelgroup.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A PHP client for the BinaryLane API - servers, server actions, DNS, load balancers, VPCs and billing - over any PSR-18 HTTP client",
+            "homepage": "https://github.com/hampel/binarylane-api",
+            "keywords": [
+                "api",
+                "binarylane",
+                "cloud",
+                "dns",
+                "psr-18",
+                "servers",
+                "vps"
+            ],
+            "support": {
+                "issues": "https://github.com/hampel/binarylane-api/issues",
+                "source": "https://github.com/hampel/binarylane-api"
+            },
+            "time": "2026-09-13T00:07:26+00:00"
+        },
+        {
+            "name": "hampel/binarylane-api-laravel",
+            "version": "0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hampel/binarylane-api-laravel.git",
+                "reference": "07dce69e6b20950fda2fcc4ed2fef442740b4234"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hampel/binarylane-api-laravel/zipball/07dce69e6b20950fda2fcc4ed2fef442740b4234",
+                "reference": "07dce69e6b20950fda2fcc4ed2fef442740b4234",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8|^8.0",
+                "guzzlehttp/psr7": "^2.0|^3.0",
+                "hampel/binarylane-api": "^0.2",
+                "illuminate/contracts": "^12.0|^13.0",
+                "illuminate/http": "^12.0|^13.0",
+                "illuminate/support": "^12.0|^13.0",
+                "php": ">=8.3",
+                "psr/http-client": "^1.0",
+                "psr/http-factory": "^1.0",
+                "psr/http-message": "^1.1|^2.0",
+                "psr/log": "^1.1|^2.0|^3.0"
+            },
+            "require-dev": {
+                "illuminate/bus": "^12.0|^13.0",
+                "illuminate/queue": "^12.0|^13.0",
+                "larastan/larastan": "^3.4.2",
+                "laravel/pint": "^1.30",
+                "orchestra/testbench": "^10.0|^11.0",
+                "phpstan/phpstan": "^2.1.22",
+                "phpunit/phpunit": "^11.0|^12.0"
+            },
+            "suggest": {
+                "illuminate/bus": "Required by AwaitAction (^12.0|^13.0)",
+                "illuminate/queue": "Required by AwaitAction (^12.0|^13.0)"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "BinaryLane": "Hampel\\BinaryLane\\Api\\Laravel\\Facades\\BinaryLane"
+                    },
+                    "providers": [
+                        "Hampel\\BinaryLane\\Api\\Laravel\\BinaryLaneServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Hampel\\BinaryLane\\Api\\Laravel\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Simon Hampel",
+                    "email": "simon@hampelgroup.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Laravel service provider, manager, facade and queued action polling for the BinaryLane API client, with Http::fake() support",
+            "homepage": "https://github.com/hampel/binarylane-api-laravel",
+            "keywords": [
+                "api",
+                "binarylane",
+                "cloud",
+                "laravel",
+                "servers",
+                "vps"
+            ],
+            "support": {
+                "issues": "https://github.com/hampel/binarylane-api-laravel/issues",
+                "source": "https://github.com/hampel/binarylane-api-laravel"
+            },
+            "time": "2026-09-13T12:02:25+00:00"
         },
         {
             "name": "hampel/console-report",

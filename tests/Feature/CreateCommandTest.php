@@ -4,15 +4,23 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 /*
-| The create command polls BinaryLane with Sleep::for(10)->seconds()->while(),
-| and Sleep::fake() cannot help here - a faked sleep returns before the while
-| loop, so the poll callback never runs at all. Sleep is therefore real in these
-| tests, which is only affordable because a poll that ends the loop never
-| sleeps: the callback runs before the first sleep. Every test below has to
-| reach a stopping condition on its first poll, or it will cost ten seconds.
+| The create command waits on a backup with the client's actions()->await(),
+| and hands it a wait that goes through Sleep - so Sleep::fake() stops a test
+| sleeping. It is faked here for every test: await() checks before its first
+| sleep, so a backup that is already finished never waits, but one that is still
+| running would otherwise cost ten real seconds a poll.
+|
+| The timeout counts the seconds await() has waited, not the wall clock, which
+| is why the timeout test below drives it with faked sleeps rather than by moving
+| the clock.
 */
+
+beforeEach(function () {
+    Sleep::fake();
+});
 
 beforeEach(function () {
     $this->server = fakeServer();
@@ -63,18 +71,39 @@ it('reports a backup that errors', function () {
 it('gives up on a backup that exceeds the timeout', function () {
     config(['blbackup.timeout' => 15]);
 
-    // the clock moves while the backup is being polled, which is the only way
-    // the elapsed-time check in the poll loop can ever trip
-    fakeApi([$this->server], statuses: [function () {
-        $this->travel(20)->seconds();
-
-        return fakeAction('in-progress', 10);
-    }]);
+    fakeApi([$this->server], statuses: [fakeAction('in-progress', 10)]);
 
     $this->artisan('create', ['server' => 'web1.example.com'])
         ->expectsOutputToContain('exceeded timeout of 15 seconds')
         ->expectsOutputToContain('Error backing up web1.example.com - status: in-progress')
         ->assertFailed();
+
+    // ten seconds between polls, and never past the deadline: the second wait is
+    // cut to the five that are left, so the timeout reported is the one asked for
+    Sleep::assertSequence([
+        Sleep::for(10)->seconds(),
+        Sleep::for(5)->seconds(),
+    ]);
+});
+
+it('does not wait on a backup that is already finished', function () {
+    fakeApi([$this->server]);
+
+    $this->artisan('create', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    Sleep::assertNeverSlept();
+});
+
+it('reports a backup that is waiting on something and will not finish by itself', function () {
+    // blocked on an unpaid invoice: still in progress on paper, and it would stay
+    // that way for the whole timeout if it were only polled
+    fakeApi([$this->server], statuses: [array_merge(fakeAction('in-progress', 10), ['blocking_invoice_id' => 4242])]);
+
+    $this->artisan('create', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('Error backing up web1.example.com - status: blocked')
+        ->assertFailed();
+
+    Sleep::assertNeverSlept();
 });
 
 it('backs up every server with --all', function () {
@@ -287,5 +316,22 @@ it('reports failure when a backup is taken but the download fails', function () 
         ->expectsOutputToContain('Completed server backup web1.example.com')
         ->expectsOutputToContain('Could not download file')
         ->expectsOutputToContain('1 server backup(s) did not complete')
+        ->assertFailed();
+});
+
+it('reports a backup that was accepted with no action to follow', function () {
+    // a bodiless 202 is a documented answer to every server action. There is then
+    // nothing to wait on, and nothing here can tell whether the backup happened
+    Http::fake(function ($request) {
+        $path = parse_url($request->url(), PHP_URL_PATH);
+
+        return match (true) {
+            str_ends_with($path, '/actions') => Http::response('', 202),
+            default => Http::response(['servers' => [fakeServer()], 'meta' => ['total' => 1]]),
+        };
+    });
+
+    $this->artisan('create', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('accepted the backup of web1.example.com but returned no action to follow')
         ->assertFailed();
 });

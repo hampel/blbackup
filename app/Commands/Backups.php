@@ -2,7 +2,10 @@
 
 namespace App\Commands;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Hampel\BinaryLane\Api\Entity\Image;
+use Hampel\BinaryLane\Api\Entity\ImageDownload;
+use Hampel\BinaryLane\Api\Enum\ImageType;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
@@ -36,7 +39,11 @@ class Backups extends BaseCommand
 
         if (empty($hostnameOrServerId))
         {
-            $images = $this->api->images();
+            // this account's own backups, across every page. The unfiltered image
+            // list is mostly BinaryLane's operating system catalogue, and one page
+            // of it held only the backups that happened to sort into the first
+            // twenty - all of them today, and fewer once the account has more
+            $images = iterator_to_array($this->binarylane->images()->backups(), false);
 
             if (empty($images))
             {
@@ -46,11 +53,9 @@ class Backups extends BaseCommand
             if ($this->option('ids'))
             {
                 collect($images)->sortBy('id')
-                    ->reject(function ($image) {
-                        return $image['public'] == true || $image['type'] != 'backup';
-                    })
-                    ->each(function ($image) {
-                        $this->line($image['id']);
+                    ->reject(fn (Image $image) => $this->isNotOwnBackup($image))
+                    ->each(function (Image $image) {
+                        $this->line((string) $image->id);
                     });
             }
             else
@@ -69,11 +74,11 @@ class Backups extends BaseCommand
         if (is_numeric($hostnameOrServerId))
         {
             // $hostname is server_id
-            $server = $this->api->server($hostnameOrServerId);
+            $server = $this->binarylane->servers()->get((int) $hostnameOrServerId);
         }
         else
         {
-            $servers = $this->api->servers($hostnameOrServerId);
+            $servers = $this->serversNamed($hostnameOrServerId);
 
             if (empty($servers))
             {
@@ -83,7 +88,7 @@ class Backups extends BaseCommand
             $server = $servers[0];
         }
 
-        $backups = $this->api->backups($server);
+        $backups = iterator_to_array($this->binarylane->servers()->eachBackup($server->id), false);
 
         if (empty($backups))
         {
@@ -92,14 +97,14 @@ class Backups extends BaseCommand
 
         if ($this->option('ids'))
         {
-            collect($backups)->sortBy('id')->each(function ($backup) {
-                $this->line($backup['id']);
+            collect($backups)->sortBy('id')->each(function (Image $backup) {
+                $this->line((string) $backup->id);
             });
         }
         else
         {
             $this->newLine();
-            $this->line("Backups for {$server['name']} ({$server['id']}):");
+            $this->line("Backups for {$server->name} ({$server->id}):");
             $this->newLine();
 
             $this->listImages($backups);
@@ -114,24 +119,24 @@ class Backups extends BaseCommand
 
         $table = collect($images)
             ->sortBy('id')
-            ->reject(function ($image) {
-                return $image['public'] == true || $image['type'] != 'backup';
-            })
-            ->map(function ($image) use (&$links) {
+            ->reject(fn (Image $image) => $this->isNotOwnBackup($image))
+            ->map(function (Image $image) use (&$links) {
 
                 if ($this->option('urls'))
                 {
-                    $links[$image['id']] = $this->api->link($image['id']);
+                    $links[$image->id] = $this->binarylane->images()->download($image->id);
                 }
 
-                $created = Carbon::createFromFormat("Y-m-d\TH:i:sT", $image['created_at']);
+                // UTC from the client, set explicitly all the same: the first column
+                // is labelled UTC, and the process default is the configured timezone
+                $created = $image->createdAt === null ? null : CarbonImmutable::instance($image->createdAt)->setTimezone('UTC');
 
                 return [
-                    'image_id' => Str::padLeft($image['id'], 9),
-                    'full_name' => $image['full_name'],
-                    'created_at' => $created->toDateTimeString(),
-                    'created_at_local' => $created->timezone(config('blbackup.timezone'))->toDateTimeString(),
-                    'size' => Str::padLeft(Number::format($image['size_gigabytes'], 2), 7),
+                    'image_id' => Str::padLeft((string) $image->id, 9),
+                    'full_name' => (string) $image->fullName,
+                    'created_at' => $created?->toDateTimeString() ?? '',
+                    'created_at_local' => $created?->setTimezone(config('blbackup.timezone'))->toDateTimeString() ?? '',
+                    'size' => Str::padLeft(Number::format($image->sizeGigabytes, 2), 7),
                 ];
             });
 
@@ -152,10 +157,23 @@ class Backups extends BaseCommand
         $this->line("Backup download URLs");
         $this->newLine();
 
-        collect($links)->each(function ($link) {
-            $this->line("Backup ID: {$link['id']}");
-            $this->line($link['disks'][0]['compressed_url']);
+        collect($links)->each(function (ImageDownload $link) {
+            $this->line("Backup ID: {$link->id}");
+            $this->line($this->compressedUrl($link) ?? '(no compressed download available)');
             $this->newLine();
         });
+    }
+
+    /**
+     * An image this listing leaves out: a public one, or anything that is not a
+     * backup.
+     *
+     * By type, deliberately, not the client's isBackup() - which also counts an
+     * image carrying backup_info whatever its type, and would widen what this
+     * listing has always shown.
+     */
+    protected function isNotOwnBackup(Image $image) : bool
+    {
+        return $image->public || $image->type !== ImageType::Backup;
     }
 }

@@ -326,3 +326,16 @@ it('runs wget from the download root', function () {
     Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'wget')
         && $process->path === downloadPath());
 });
+
+it('refuses a disk that only offers the raw image', function () {
+    // saved as .zst, a raw disk fails zstd --test and is deleted - after the whole
+    // disk has been transferred. The client's own url() would fall back to it
+    fakeApi([$this->server], [$this->image], [12345 => ['id' => 12345, 'disks' => [['raw_url' => 'https://images.binarylane.com.au/raw-12345.img']]]]);
+    fakeBinaries();
+
+    $this->artisan('download', ['server' => 'web1.example.com'])
+        ->expectsOutputToContain('No download link found for web1.example.com image 12345')
+        ->assertFailed();
+
+    Process::assertNothingRan();
+});

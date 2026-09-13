@@ -170,3 +170,14 @@ it('fails when the hostname matches no server', function () {
         ->expectsOutputToContain('No server data returned for nothing.example.com')
         ->assertFailed();
 });
+
+it('asks for the backups on the account rather than every image', function () {
+    // the unfiltered image list is mostly BinaryLane's operating system catalogue,
+    // and one page of it held only whichever backups sorted into the first twenty
+    fakeApi([$this->server], [$this->image]);
+
+    expect(Artisan::call('backups', ['--ids' => true]))->toBe(0);
+
+    Http::assertSent(fn ($request) => str_ends_with(parse_url($request->url(), PHP_URL_PATH), '/images')
+        && str_contains($request->url(), 'type=backup'));
+});

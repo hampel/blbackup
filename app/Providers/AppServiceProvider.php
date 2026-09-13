@@ -7,8 +7,6 @@ use App\Support\RunSummary;
 use App\Support\SlackSummary;
 use GuzzleHttp\Client;
 use Hampel\SlackMessage\SlackWebhook;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -18,10 +16,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Http::macro('binarylane', function () : PendingRequest {
-            return Http::withToken(config('blbackup.api_token'))->baseUrl('https://api.binarylane.com.au/v2');
-        });
-
         date_default_timezone_set(config('blbackup.timezone', 'UTC'));
     }
 

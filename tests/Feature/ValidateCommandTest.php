@@ -214,18 +214,19 @@ it('calls the api to prove the token works', function () {
 });
 
 it('fails when the api rejects the token', function () {
-    Http::fake(['*' => Http::response(['error' => 'unauthorized'], 401)]);
+    Http::fake(['*' => Http::response('', 401)]);
 
     [$exit, $output] = validate();
 
     expect($exit)->toBe(1)
         ->and($output)->toContain('[fail] BinaryLane API')
-        ->toContain('[401]');
+        ->toContain('HTTP 401');
 });
 
 it('fails when no api token is configured', function () {
     fakeApi([fakeServer()]);
-    config(['blbackup.api_token' => null]);
+    // the token the client sends, which lives in its own config
+    config(['binarylane.accounts.main.token' => null]);
 
     [$exit, $output] = validate();
 
@@ -762,4 +763,29 @@ it('does not count it in when the two point somewhere different', function () {
     expect($exit)->toBe(0)
         ->and($output)->toContain('check they arrived')
         ->not->toContain('so expect');
+});
+
+it('reports how many servers the account has, not how many fit on a page', function () {
+    // one server on the page and twenty-five on the account: the line used to
+    // count the page, so it could never say more than twenty
+    fakeApi([fakeServer()]);
+    Http::swap(new Illuminate\Http\Client\Factory);
+    app()->forgetInstance(Psr\Http\Client\ClientInterface::class);
+    app()->forgetInstance(Hampel\BinaryLane\Api\Laravel\BinaryLaneManager::class);
+
+    Http::fake(function ($request) {
+        $path = parse_url($request->url(), PHP_URL_PATH);
+
+        return match (true) {
+            str_ends_with($path, '/account') => Http::response(['account' => fakeAccount()]),
+            str_ends_with($path, '/servers') => Http::response(['servers' => [fakeServer()], 'meta' => ['total' => 25]]),
+            default => Http::response(['error' => "unexpected request to {$path}"], 404),
+        };
+    });
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toMatch('/\[ ok \] Servers visible\s+25/');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'per_page=0'));
 });

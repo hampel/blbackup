@@ -6,6 +6,46 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The BinaryLane API is reached through `hampel/binarylane-api-laravel`** rather
+  than a client built into this tool. Error messages from the API now name the
+  request and the status — `BinaryLane rejected GET .../v2/account (HTTP 401): the
+  API token was missing, malformed, expired or revoked` — in place of the shorter
+  `Could not fetch account information [401]: Unauthorized`.
+- **Each API request is bounded at 10 seconds, and its connection at 5** —
+  previously the HTTP client's defaults, 30 and 10. Set
+  `BINARYLANE_TIMEOUT` and `BINARYLANE_CONNECT_TIMEOUT` to change them. They do not
+  bound a download or a backup being taken; `DOWNLOAD_TIMEOUT` still does.
+- **A backup blocked on a question or an unpaid invoice fails at once**, reported
+  as `status: blocked`, rather than being polled until the timeout.
+- **The backup timeout counts the time spent waiting between checks**, not the
+  time elapsed, so the time taken by the requests themselves is not charged
+  against it.
+- **An API failure is written to the log twice**: once by the API client, and once
+  by the command reporting it. At a Slack log level of `error`, one failure posts
+  two messages.
+
+### Fixed
+
+- **Every page of servers is read.** The API returns 20 servers a page, and
+  `create --all`, `download --all` and `servers` read only the first, so an
+  account with more than 20 servers had the rest left out without a word.
+- **`backups` with no server lists every backup on the account.** It read the
+  first page of all images — operating system images included — and listed only
+  the backups among those 20.
+- **`app:validate` reports how many servers the account has.** Its `Servers
+  visible` line counted one page, so it could not report more than 20.
+- **A backup the API accepts without an action to follow is reported as a
+  failure**, where it previously ended the command with a PHP error.
+- **A backup offering no compressed download is reported as having no download
+  link**, rather than failing in `wget`.
+- **`.env.example` and the README no longer say an API token can be limited to
+  reading and taking backups.** BinaryLane tokens have no scopes: a token can do
+  anything its account can.
+
 ## [2.5.0] - 2026-09-11
 
 ### Changed

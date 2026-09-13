@@ -25,11 +25,14 @@ class Account extends BaseCommand
      */
     public function handle()
     {
-        $account = $this->api->account();
+        $account = $this->binarylane->account()->get();
 
         $this->table(
             ['Email', 'Status'],
-            [[$account['email'], $account['status']]]
+            // the raw status when the client has no case for it: a status added to
+            // the API since the client was released is still worth showing, and a
+            // blank cell would read as the account having none
+            [[$account->email, $account->status?->value ?? (string) ($account->raw['status'] ?? '')]]
         );
 
         return self::SUCCESS;
