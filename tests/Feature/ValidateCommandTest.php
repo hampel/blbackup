@@ -784,3 +784,36 @@ it('reports how many servers the account has, not how many fit on a page', funct
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'per_page=0'));
 });
+
+it('warns rather than fails when the remote path has not been created yet', function () {
+    // exit 3 is rclone's "directory not found": the remote answered, and on a new install
+    // the first backup moved is what creates the path. Failing here failed the rebuild
+    // gate before a single backup had run
+    fakeApi([fakeServer()]);
+    fakeBinaries([
+        '*--version*' => Process::result(output: 'some tool v1.2.3'),
+        '*lsd*' => Process::result(errorOutput: 'directory not found', exitCode: 3),
+    ]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] rclone remote')
+        ->toContain('does not exist yet')
+        ->not->toContain('did not answer');
+});
+
+it('still fails a remote rclone cannot reach or does not know', function () {
+    // exit 1 is a remote name missing from the config, a refused login, no network - so
+    // treating exit 3 as reachable must not widen to every non-zero exit
+    fakeApi([fakeServer()]);
+    fakeBinaries([
+        '*--version*' => Process::result(output: 'some tool v1.2.3'),
+        '*lsd*' => Process::result(errorOutput: 'failed to authenticate', exitCode: 2),
+    ]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)->and($output)->toContain('[fail] rclone remote');
+});
+

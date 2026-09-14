@@ -52,6 +52,12 @@ class AppValidate extends BaseCommand
     protected const HIGHEST_LOGGED_LEVEL = 'error';
 
     /**
+     * rclone's exit code for a listing whose directory does not exist - as opposed to 1, a
+     * remote it cannot reach or does not know. See checkRemote().
+     */
+    protected const RCLONE_DIRECTORY_NOT_FOUND = 3;
+
+    /**
      * Set once the log destination is known to be unwritable, so nothing tries
      * to write to it again.
      */
@@ -681,6 +687,21 @@ class AppValidate extends BaseCommand
         catch (ProcessTimedOutException $e)
         {
             $this->reportFail("rclone remote", "{$remote} did not answer within the process timeout");
+
+            return;
+        }
+
+        // rclone's exit code 3 is "directory not found": the remote answered, and the path
+        // beneath it does not exist. On a new install that is every install, because the
+        // first backup moved there is what creates it - so failing here failed the rebuild
+        // gate before a single backup had run, blaming a connection that was fine. A warning
+        // rather than a pass, because on an install that has been moving backups the same
+        // answer means the path has a typo and backups would quietly start somewhere new.
+        // A remote name that does not exist is exit 1, and still fails below.
+        if ($result->exitCode() === self::RCLONE_DIRECTORY_NOT_FOUND)
+        {
+            $this->reportWarn("rclone remote", "{$remote} answered, but that path does not exist yet"
+                . " - normal before the first backup is moved; a typo in the path otherwise");
 
             return;
         }

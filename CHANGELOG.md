@@ -17,6 +17,14 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **`app:config` shows the API connect timeout and the Slack emoji**, the two documented
   settings it did not list.
 
+### Fixed
+
+- **`app:validate` no longer fails a remote whose path has not been created yet.** A new
+  install's `RCLONE_REMOTE` path is created by the first backup moved there, so the check
+  failed — reporting the remote as unreachable — before any backup had run. It now warns that
+  the path does not exist, which is normal before the first move and a typo otherwise. A remote
+  that cannot be reached or is not configured still fails.
+
 ## [2.6.0] - 2026-09-14
 
 ### Changed
