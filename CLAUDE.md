@@ -391,7 +391,12 @@ it won over the one in `cwd`, and the storage path followed `cwd` regardless.
 Under cron that splits: the binary reads its settings from where it lives and
 writes its logs to wherever the crontab last changed to, which is why
 `LARAVEL_STORAGE_PATH` exists and why `app:config` reports what each path
-resolved against.
+resolved against. **`app:config` also reports the `.env` it read**, from bindings
+`bootstrap/app.php` records — `blbackup.env.loaded` and `blbackup.env.candidates`,
+the names `wback` and `sites` use. The bootstrap writes the framework's answer down
+rather than choosing a file; don't report `environmentFilePath()` directly, which
+names a path inside the archive from a compiled binary whether or not anything is
+there.
 
 **Logging still resolves to nothing until `LOG_STACK` is set.** `logging.default`
 is `stack`, but the stack's own channel list defaults to `null`, which discards

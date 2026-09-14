@@ -6,6 +6,15 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`app:config` reports the environment file it read**, or where it looked when there was
+  none. A compiled binary reads the `.env` beside itself rather than the one in the working
+  directory, so a setting that seems to be ignored is most often in a file that was never
+  read — and with no file at all, every setting shows its default and nothing else says why.
+
 ## [2.6.0] - 2026-09-14
 
 ### Changed

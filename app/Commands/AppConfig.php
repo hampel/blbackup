@@ -55,6 +55,7 @@ class AppConfig extends Command
                 'Laravel Version' => $this->app::VERSION,
                 'PHP Version' => phpversion(),
                 'Environment' => $this->laravel->environment(),
+                'Environment File' => $this->environmentFile(),
                 'Timezone' => config('blbackup.timezone'),
             ],
 
@@ -100,6 +101,39 @@ class AppConfig extends Command
         ], $this->option('only'));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * The environment file that was read, or where it was looked for.
+     *
+     * Not environmentFilePath(), which answers with base_path().'/.env' whether or not
+     * anything is there - and inside a compiled binary that names a file in the phar,
+     * which has never been opened and cannot be. It reads exactly like a real answer,
+     * which is the one thing this line must not do: it is where someone goes first when
+     * a setting is not taking effect, and a compiled binary reads the .env beside itself
+     * rather than the one in the working directory.
+     *
+     * bootstrap/app.php records the answer, so this reports it rather than working it out
+     * a second time and drifting from what was really loaded.
+     */
+    protected function environmentFile() : string
+    {
+        $loaded = $this->laravel->bound('blbackup.env.loaded')
+            ? $this->laravel->make('blbackup.env.loaded')
+            : null;
+
+        if ($loaded !== null)
+        {
+            return $this->path($loaded);
+        }
+
+        $candidates = $this->laravel->bound('blbackup.env.candidates')
+            ? $this->laravel->make('blbackup.env.candidates')
+            : [];
+
+        return empty($candidates)
+            ? $this->notSet()
+            : '<fg=yellow>none found</> - looked in ' . implode(', ', $candidates);
     }
 
     /**
