@@ -26,8 +26,9 @@ $app->singleton(
  * base_path().'/.env' whether or not anything is there - and inside a phar that names a
  * file in the archive that has never been opened, which reads exactly like a real answer.
  *
- * The same binding names wback and sites use, which also search further afield before
- * loading. blbackup does not, so there is one candidate, not a list to walk.
+ * The binding names other command-line tools in this style use, where the bootstrap also
+ * searches further afield before loading. This one does not, so there is one candidate,
+ * not a list to walk.
  */
 $phar = \Phar::running(false);
 $envFile = $phar ? dirname($phar) . DIRECTORY_SEPARATOR . '.env' : $app->environmentFilePath();

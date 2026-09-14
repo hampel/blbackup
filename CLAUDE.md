@@ -407,7 +407,7 @@ writes its logs to wherever the crontab last changed to, which is why
 `LARAVEL_STORAGE_PATH` exists and why `app:config` reports what each path
 resolved against. **`app:config` also reports the `.env` it read**, from bindings
 `bootstrap/app.php` records — `blbackup.env.loaded` and `blbackup.env.candidates`,
-the names `wback` and `sites` use. The bootstrap writes the framework's answer down
+the names other tools in this style use. The bootstrap writes the framework's answer down
 rather than choosing a file; don't report `environmentFilePath()` directly, which
 names a path inside the archive from a compiled binary whether or not anything is
 there.
