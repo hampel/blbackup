@@ -9,8 +9,8 @@ drives the BinaryLane API to take temporary server snapshots, then shells out to
 `wget`, `zstd` and `rclone` to download, verify, ship and expire the resulting
 compressed disk images.
 
-`README.md` is upstream Laravel Zero boilerplate and describes the framework, not
-this app.
+`README.md` is the user-facing documentation: installation, configuration, the crontab,
+alerting and validating an install. This file is for working on the code.
 
 ## Commands
 
