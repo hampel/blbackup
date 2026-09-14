@@ -6,6 +6,15 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-09-15
+
+### Fixed
+
+- **The test suite passes on a checkout with no `.env`.** One test read the environment file
+  the bootstrap records in a way that throws when there is none, so 2.7.0's CI failed and it
+  was never published as a release. The tool itself is unchanged from 2.7.0, which has the
+  notes below.
+
 ## [2.7.0] - 2026-09-14
 
 ### Added
@@ -455,6 +464,7 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
+[2.7.1]: https://github.com/hampel/blbackup/compare/2.7.0...2.7.1
 [2.7.0]: https://github.com/hampel/blbackup/compare/2.6.0...2.7.0
 [2.6.0]: https://github.com/hampel/blbackup/compare/2.5.0...2.6.0
 [2.5.0]: https://github.com/hampel/blbackup/compare/2.4.0...2.5.0
