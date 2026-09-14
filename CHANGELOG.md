@@ -17,6 +17,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **`app:config` shows the API connect timeout and the Slack emoji**, the two documented
   settings it did not list.
 
+### Changed
+
+- **Moved to `hampel/binarylane-api-laravel` 0.6.0** (`hampel/binarylane-api` 0.5.0), from
+  0.3.0. Nothing this tool does changes: the releases in between affect DNS records, reverse
+  names, how the HTTP transport is overridden and one server field, and it uses none of them.
+  The API request and connect timeouts still apply.
+
 ### Fixed
 
 - **`app:validate` no longer fails a remote whose path has not been created yet.** A new
