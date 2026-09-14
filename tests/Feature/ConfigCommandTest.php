@@ -36,10 +36,15 @@ it('records the file the framework reads from a checkout', function () {
     // bootstrap/app.php writes the answer down rather than choosing it, so what it
     // records has to be the file Laravel Zero would load - not base_path('.env') as
     // a guess inside a compiled binary, where that path is in the archive
+    //
+    // Read the way app:config reads it. A null bound with instance() does not count as
+    // bound, so resolving it throws - which a checkout with a .env never sees and CI,
+    // with none, did. Released 2.7.0 with its tests red for exactly that.
     $expected = app()->environmentFilePath();
+    $loaded = app()->bound('blbackup.env.loaded') ? app('blbackup.env.loaded') : null;
 
     expect(app('blbackup.env.candidates'))->toBe([$expected])
-        ->and(app('blbackup.env.loaded'))->toBe(is_file($expected) ? $expected : null);
+        ->and($loaded)->toBe(is_file($expected) ? $expected : null);
 });
 
 it('shows the API connect timeout beside the request timeout', function () {
