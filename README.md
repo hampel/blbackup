@@ -113,7 +113,13 @@ its logs and the default download path **against the working directory**. Under
 cron those are rarely the same place — the working directory is wherever the
 crontab last changed to — so keep `.env` beside the binary and set an absolute
 `LARAVEL_STORAGE_PATH`. `blbackup app:config` reports what each path resolved
-to.
+to, and which `.env` it read.
+
+**A key set in `.env` takes precedence over an exported environment variable**, so
+`KEEPONLY_DAYS=30 blbackup clean` does not override a `KEEPONLY_DAYS` the file sets.
+An exported variable applies only to a key the file does not mention — and an empty
+`KEEPONLY_DAYS=` line counts as mentioning it, so it wins with an empty value. Edit
+the file, or comment the line out, to change a setting for one run.
 
 ### From source
 
