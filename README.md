@@ -291,9 +291,28 @@ which looks exactly like a cron entry nobody installed.
 **The run summary** is one message per run saying what it did — servers backed
 up, bytes downloaded, files moved, files expired, how long it took, and what
 failed. That is the thing that tells a working backup from an uninstalled one.
-Set `BLBACKUP_SUMMARY_SLACK_WEBHOOK` to enable it, and
-`BLBACKUP_SUMMARY_NOTIFY=failure` if you would rather have silence than a
-nightly all-clear.
+Set `BLBACKUP_SUMMARY_SLACK_WEBHOOK` to enable it.
+
+**`BLBACKUP_SUMMARY_NOTIFY=failure` posts only the bad nights, and costs the
+property the summary exists for.** With it, a night where everything worked and
+a night where nothing ran at all look the same — nothing arrives either way. Use
+it only if something else is watching for runs that never happen.
+
+**Nothing blbackup does can report a run that was never attempted.** A machine
+that was off, a crontab that was removed, a container runtime that did not start:
+no process runs, so no failure is sent, and no setting here changes that. The
+nightly summary covers it only as long as somebody notices when one does not
+arrive. To have it noticed for you, use a dead-man's switch — an external service
+that alerts when an expected check-in is missed — and check in after the run:
+
+```cron
+0 2 * * * cd /opt/blbackup && \
+          docker compose run --rm blbackup php blbackup cron >> /var/log/blbackup/cron.log 2>&1 && \
+          curl -fsS --retry 3 https://checks.example.test/blbackup
+```
+
+The `&&` checks in only when the run exits 0, so a failed run is reported by the
+missing check-in as well as by the summary.
 
 Only `cron` posts a summary. Every stage can be run by hand, and a summary
 posted for a command somebody is sitting and watching is noise delivered to the
