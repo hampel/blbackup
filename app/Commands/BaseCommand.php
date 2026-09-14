@@ -100,7 +100,7 @@ abstract class BaseCommand extends Command
             catch (BinaryLaneFailure | DownloadFailed $e)
             {
                 Log::error($e->getMessage());
-                $this->components->error($e->getMessage());
+                $this->printFailure($e->getMessage());
 
                 $this->summary->recordFailure($this->getName(), $this->getName(), $e->getMessage());
 
@@ -174,9 +174,40 @@ abstract class BaseCommand extends Command
             Log::error($message);
 
             $this->recordFailedStart($message);
+
+            // Laravel prints this itself, with components->error() inside its own execute(),
+            // which is too far in for BaseCommand to intercept - and that call writes at
+            // normal verbosity, so under --quiet nothing printed at all. So print it here
+            // under --quiet only: at normal verbosity Laravel's line is the one, and printing
+            // both would say it twice
+            if ($this->output !== null && $this->output->isQuiet())
+            {
+                $this->printFailure($message);
+            }
         }
 
         parent::fail($exception);
+    }
+
+    /**
+     * Print the failure that stopped this command, whatever the verbosity.
+     *
+     * components->error() writes at normal verbosity, so under --quiet a revoked token or
+     * a missing server list printed nothing at all - while the failure of a single server,
+     * which goes through log(), printed. --quiet is how a crontab asks to hear only about
+     * trouble, and cron mails output rather than an exit code, so the failures that stop a
+     * whole run were the ones that mailed nobody. Normal output is left exactly as it was.
+     */
+    protected function printFailure(string $message) : void
+    {
+        if ($this->output->isQuiet())
+        {
+            $this->output->writeln("<error>ERROR</error> {$message}", OutputInterface::VERBOSITY_QUIET);
+
+            return;
+        }
+
+        $this->components->error($message);
     }
 
     /**

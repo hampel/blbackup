@@ -24,6 +24,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   failed — reporting the remote as unreachable — before any backup had run. It now warns that
   the path does not exist, which is normal before the first move and a typo otherwise. A remote
   that cannot be reached or is not configured still fails.
+- **A failure that stops a command now prints under `--quiet`.** A rejected API token, a
+  missing server list and the other failures that end a command outright exited 1 and printed
+  nothing, while the failure of a single server printed. Since cron mails output rather than an
+  exit code, `cron -q` sent no mail for exactly the failures that stop a whole run.
 
 ## [2.6.0] - 2026-09-14
 

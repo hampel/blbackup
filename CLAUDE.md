@@ -103,7 +103,11 @@ Three things the package does that this tool used to do badly or not at all:
 
 **`BaseCommand::execute()` catches that interface and `DownloadFailed`** for the
 whole command, logs and prints them, and returns FAILURE — so command code calls
-`$this->binarylane->…` straight, with no try/catch. Subclasses set
+`$this->binarylane->…` straight, with no try/catch. **Both it and `fail()` print through
+`printFailure()`, because `components->error()` writes at normal verbosity** and so says
+nothing under `--quiet` — the one flag a crontab uses to hear only about trouble. `fail()`
+prints only when quiet: at normal verbosity Laravel prints it from inside its own
+`execute()`, which is too far in for `BaseCommand` to catch, and printing both says it twice. Subclasses set
 `protected string $commandContext`, which is pushed into `Log::withContext()` so
 every record from a run is tagged with the command.
 
