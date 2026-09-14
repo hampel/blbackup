@@ -63,6 +63,7 @@ class AppConfig extends Command
                 // the default account's token, which is the one the client sends
                 'API Token' => $this->secretStatus(config('binarylane.accounts.' . app(BinaryLaneManager::class)->getDefaultAccount() . '.token')),
                 'API Request Timeout' => (string) config('binarylane.timeout'),
+                'API Connect Timeout' => (string) config('binarylane.connect_timeout'),
                 'Download Timeout' => (string) config('blbackup.timeout'),
                 'Keep Only Days' => (string) config('blbackup.keeponly_days'),
                 'Include File' => $this->optionalPath(config('blbackup.include_file')),
@@ -91,6 +92,7 @@ class AppConfig extends Command
                 'Daily Days' => (string) config('logging.channels.daily.days'),
                 'Slack Webhook' => $this->secretStatus(config('logging.channels.slack.url')),
                 'Slack Username' => $this->optional(config('logging.channels.slack.username')),
+                'Slack Emoji' => $this->optional(config('logging.channels.slack.emoji')),
                 'Slack Level' => config('logging.channels.slack.level'),
             ],
 

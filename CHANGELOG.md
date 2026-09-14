@@ -14,6 +14,8 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   none. A compiled binary reads the `.env` beside itself rather than the one in the working
   directory, so a setting that seems to be ignored is most often in a file that was never
   read — and with no file at all, every setting shows its default and nothing else says why.
+- **`app:config` shows the API connect timeout and the Slack emoji**, the two documented
+  settings it did not list.
 
 ## [2.6.0] - 2026-09-14
 

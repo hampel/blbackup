@@ -41,3 +41,24 @@ it('records the file the framework reads from a checkout', function () {
     expect(app('blbackup.env.candidates'))->toBe([$expected])
         ->and(app('blbackup.env.loaded'))->toBe(is_file($expected) ? $expected : null);
 });
+
+it('shows the API connect timeout beside the request timeout', function () {
+    // the setting that decides how long a BinaryLane host that will not answer takes to
+    // fail - applied since binarylane-api-laravel 0.3.0, and absent from this dump until
+    // then, which read as a setting the tool did not have
+    config(['binarylane.timeout' => 12, 'binarylane.connect_timeout' => 7]);
+
+    Artisan::call('app:config', ['--only' => 'binarylane']);
+
+    expect(Artisan::output())
+        ->toMatch('/API Request Timeout \.+ 12/')
+        ->toMatch('/API Connect Timeout \.+ 7/');
+});
+
+it('shows the slack emoji', function () {
+    config(['logging.channels.slack.emoji' => ':floppy_disk:']);
+
+    Artisan::call('app:config', ['--only' => 'logging']);
+
+    expect(Artisan::output())->toMatch('/Slack Emoji \.+ :floppy_disk:/');
+});
