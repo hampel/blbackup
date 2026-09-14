@@ -20,6 +20,13 @@ rclone.conf
 # Artwork for configuring the Slack channel - nothing at runtime reads it
 /assets
 
+# A git bundle of the whole repository, which a backup job can leave in a working
+# copy - every branch, tag and stash, unpushed work included. It is kept out of git
+# by a global ignore file, and that is exactly why it needs naming here: the build
+# context reads .dockerignore and nothing else, so a file git never shows is copied
+# into the image all the same.
+.backup.bundle
+
 # The image does not need the history, the tests or the editor's opinions
 /.git
 /.idea
