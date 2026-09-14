@@ -5,6 +5,7 @@ namespace App\Commands;
 use App\Exceptions\DownloadFailed;
 use App\Support\BackupLock;
 use App\Support\ImageDownloader;
+use App\Support\SignedUrl;
 use App\Support\SlackSummary;
 use Hampel\BinaryLane\Api\Exception\ExceptionInterface as BinaryLaneFailure;
 use Hampel\ConsoleReport\RendersChecks;
@@ -834,7 +835,9 @@ class AppValidate extends BaseCommand
 
         $path = '.blbackup-validate-download';
 
-        $this->line("  Downloading [{$url}]");
+        // redacted even though the operator typed it: the README suggests pasting a real
+        // backup link here, and this output is what gets pasted into a ticket
+        $this->line("  Downloading [" . SignedUrl::redact($url) . "]");
 
         $progress = new ProgressBar($this->output, 100);
         $progress->start();

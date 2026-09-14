@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Support\ImageDownloader;
+use App\Support\SignedUrl;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
 use Hampel\BinaryLane\Api\Entity\Image;
@@ -292,9 +293,9 @@ class Download extends BaseCommand
 
         $this->log(
             'notice',
-            "Downloading {$server->name} image from [{$url}] to [{$path}]",
+            "Downloading {$server->name} image from [" . SignedUrl::redact($url) . "] to [{$path}]",
             "Downloading image",
-            ['server' => $server->name, 'url' => $url, 'path' => $path]
+            ['server' => $server->name, 'url' => SignedUrl::redact($url), 'path' => $path]
         );
 
         $fullPath = Storage::disk('downloads')->path($path);
@@ -412,19 +413,22 @@ class Download extends BaseCommand
 
         $cmd = "{$wget} {$url} -O {$path}";
 
-        $this->logCmd('wget', $cmd);
+        // the command that runs keeps the real URL; the one written down does not
+        $this->logCmd('wget', SignedUrl::redactAll($cmd));
 
         $result = $this->processWget($cmd, Storage::disk('downloads')->path(''));
 
         if ($result->failed())
         {
-            $output = trim($result->errorOutput());
+            // wget's error output begins with the URL it was given, and names every
+            // redirect it followed - so all of it is redacted, not just the known URL
+            $output = SignedUrl::redactAll(trim($result->errorOutput()));
 
             $this->log(
                 'error',
                 "Could not download file: " . $output,
                 "Could not download file",
-                compact('output', 'cmd')
+                ['output' => $output, 'cmd' => SignedUrl::redactAll($cmd)]
             );
         }
 

@@ -25,7 +25,7 @@ class ImageDownloader
      */
     public function download(string $url, string $path, callable $progress) : void
     {
-        Log::debug('Downloading image', compact('url', 'path'));
+        Log::debug('Downloading image', ['url' => SignedUrl::redact($url), 'path' => $path]);
 
         try
         {

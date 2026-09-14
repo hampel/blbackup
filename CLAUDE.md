@@ -314,6 +314,16 @@ against an arbitrary URL. **It is not part of the API client, because it is not 
 API call:** the pre-signed URL carries its own authorisation and points at storage
 rather than at the API. Its failures raise `App\Exceptions\DownloadFailed`.
 
+**A download URL is a credential, so nothing writes one down.** It needs no
+authentication and is valid for 24 hours, and its secret is in the path rather than
+a query string. `App\Support\SignedUrl::redact()` reduces one to its host, and
+`redactAll()` does every URL in a piece of text — which is what wget's error output
+needs, since it names the URL it was given and every redirect it followed. Every log
+line, printed line and exception message that can carry one goes through it; the
+process that runs keeps the real URL. `backups --urls` is the deliberate exception.
+`SignedUrlTest` puts a token in the path and looks for it in every log record's
+message and context, the console and the run summary.
+
 **Only the compressed URL is ever downloaded.** `BaseCommand::compressedUrl()`
 reads `compressedUrl` and nothing else, where the disk's own `url()` would fall
 back to the raw image. A raw disk saved as `.zst` fails `zstd --test` and is

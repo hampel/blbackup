@@ -28,6 +28,12 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   missing server list and the other failures that end a command outright exited 1 and printed
   nothing, while the failure of a single server printed. Since cron mails output rather than an
   exit code, `cron -q` sent no mail for exactly the failures that stop a whole run.
+- **A backup image's download URL is no longer written to the log, the console or a failure
+  message.** The URL needs no authentication and is valid for 24 hours, so it grants the whole
+  disk to whoever reads it. It was logged in full on every download, and on a failed download it
+  reached an `error` record — through wget's own error output, or the download exception's message
+  — which a Slack log channel at its default threshold posts. Only the host is shown now.
+  `backups --urls` still prints URLs, since that is what it is for.
 
 ## [2.6.0] - 2026-09-14
 
