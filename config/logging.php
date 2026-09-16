@@ -79,8 +79,13 @@ return [
             // env() turns the literal `null` into PHP null, so LOG_STACK=null - the value
             // .env.example documents - reached explode() as '' and built a stack of one
             // channel with no name, which Laravel cannot create. Filtering rather than
-            // special-casing null, because LOG_STACK= and a stray comma do the same thing.
-            'channels' => array_values(array_filter(explode(',', (string) env('LOG_STACK', 'null')))) ?: ['null'],
+            // special-casing null, because LOG_STACK= and a stray comma do the same thing -
+            // and trimming, because `single, slack` names a channel ' slack' that fails the
+            // same way.
+            'channels' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('LOG_STACK', 'null'))
+            ))) ?: ['null'],
             'ignore_exceptions' => false,
         ],
 

@@ -77,3 +77,12 @@ it('drops an empty entry from a list of channels', function () {
 it('still honours a stack of real channels', function () {
     expect(stackChannelsWith('single,slack'))->toBe(['single', 'slack']);
 });
+
+it('trims the space someone leaves after a comma', function () {
+    // ' slack' is not a channel, and fails exactly as the nameless one does
+    expect(stackChannelsWith('single, slack'))->toBe(['single', 'slack']);
+});
+
+it('treats a LOG_STACK of nothing but whitespace as the default', function () {
+    expect(stackChannelsWith('  '))->toBe(['null']);
+});

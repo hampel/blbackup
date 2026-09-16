@@ -14,8 +14,8 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `.env.example` documents, but the framework reads the literal word `null` as no value at all,
   leaving a stack holding one channel with no name. Laravel cannot build that, so every record
   went to its emergency log — `storage/logs/laravel.log`, which nothing here documents — while
-  the run carried on and exited 0. An empty `LOG_STACK`, and a stray comma in a list of
-  channels, did the same. Reported by another tool in this fleet, which hit it as an outright
+  the run carried on and exited 0. An empty `LOG_STACK`, a stray comma in a list of channels,
+  and a space after one — `single, slack` names a channel that does not exist — did the same. Reported by another tool in this fleet, which hit it as an outright
   failure.
 
 ## [2.7.1] - 2026-09-15
