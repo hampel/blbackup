@@ -10,6 +10,11 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A malformed line in the `.env` beside the binary is reported rather than fatal.** The
+  compiled binary died with an uncaught parse error — exit 255, and the stack trace on
+  standard output wherever `display_errors` is on, which is the default in the PHP images
+  this ships in. It now says `The environment file is invalid!` with the offending line on
+  standard error and exits 1, which is what a checkout and a container already did.
 - **`app:validate` fails a log channel that is not configured.** It reported one as
   `[ ok ] log channel (x)  unknown driver`, so a stack naming a channel that does not exist
   passed the check a deployment gates on — while Laravel answered every record with its

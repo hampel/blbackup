@@ -32,10 +32,31 @@ $app = require_once __DIR__.'/bootstrap/app.php';
 
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 
-$status = $kernel->handle(
-    $input = new Symfony\Component\Console\Input\ArgvInput,
-    new Symfony\Component\Console\Output\ConsoleOutput
-);
+/*
+ * A malformed line in the .env beside a compiled binary has to be caught here, because
+ * nothing else catches it. The framework's own environment bootstrapper reports a parse
+ * error and exits 1 - but that one only reads the project's file, and Laravel Zero loads
+ * the one beside the binary afterwards by calling Dotenv directly, with no handler. So a
+ * checkout and a container say "The environment file is invalid!" while the binary dies
+ * with an uncaught fatal: exit 255, and the stack trace on STDOUT wherever display_errors
+ * is on, which is the default in the PHP images this ships in.
+ *
+ * Same wording as the framework's, deliberately: which artefact is running should not
+ * change what a broken settings file looks like.
+ */
+try
+{
+    $status = $kernel->handle(
+        $input = new Symfony\Component\Console\Input\ArgvInput,
+        new Symfony\Component\Console\Output\ConsoleOutput
+    );
+}
+catch (Dotenv\Exception\InvalidFileException $e)
+{
+    fwrite(STDERR, 'The environment file is invalid!' . PHP_EOL . $e->getMessage() . PHP_EOL);
+
+    exit(1);
+}
 
 /*
 |--------------------------------------------------------------------------
