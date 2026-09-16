@@ -6,7 +6,7 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.7.2] - 2026-09-16
 
 ### Fixed
 
@@ -26,8 +26,8 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   leaving a stack holding one channel with no name. Laravel cannot build that, so every record
   went to its emergency log — `storage/logs/laravel.log`, which nothing here documents — while
   the run carried on and exited 0. An empty `LOG_STACK`, a stray comma in a list of channels,
-  and a space after one — `single, slack` names a channel that does not exist — did the same. Reported by another tool in this fleet, which hit it as an outright
-  failure.
+  and a space after one — `single, slack` names a channel that does not exist — did the same.
+  Reported by another tool in this fleet, which hit it as an outright failure.
 
 ## [2.7.1] - 2026-09-15
 
@@ -487,7 +487,7 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.7.1...HEAD
+[2.7.2]: https://github.com/hampel/blbackup/compare/2.7.1...2.7.2
 [2.7.1]: https://github.com/hampel/blbackup/compare/2.7.0...2.7.1
 [2.7.0]: https://github.com/hampel/blbackup/compare/2.6.0...2.7.0
 [2.6.0]: https://github.com/hampel/blbackup/compare/2.5.0...2.6.0
