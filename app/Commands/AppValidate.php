@@ -364,7 +364,22 @@ class AppValidate extends BaseCommand
             return;
         }
 
-        $this->reportOk("log channel ({$name})", $driver ?? 'unknown driver');
+        if ($driver === null)
+        {
+            // Nothing else reports this. Laravel answers a channel it cannot find with its
+            // emergency logger, so every record lands in storage/logs/laravel.log - a file
+            // this tool never mentions - and the command carries on and exits 0. LOG_CHANNEL
+            // is how it happens: env() reads the literal word `null` as no value, and the
+            // framework turns an empty default into the name "default", which nothing defines.
+            $this->reportFail("log channel ({$name})", "no channel named [{$name}] is configured"
+                . " - records would go to " . storage_path('logs/laravel.log') . " instead");
+
+            $this->stopLogging();
+
+            return;
+        }
+
+        $this->reportOk("log channel ({$name})", $driver);
     }
 
     /**

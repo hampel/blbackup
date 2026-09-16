@@ -803,6 +803,33 @@ it('warns rather than fails when the remote path has not been created yet', func
         ->not->toContain('did not answer');
 });
 
+it('fails a log channel that is not configured at all', function () {
+    // LOG_CHANNEL=null - a value .env.example lists - reaches config as PHP null, and the
+    // framework turns an empty default into the name "default", which nothing defines.
+    // Laravel answers that with its emergency logger: every record lands in a file this tool
+    // never mentions while the run exits 0, so the gate has to be what notices
+    fakeApi([fakeServer()]);
+    fakeBinaries(['*--version*' => Process::result(output: 'some tool v1.2.3')]);
+    config(['logging.default' => 'default']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] log channel (default)')
+        ->toContain('no channel named [default] is configured');
+});
+
+it('still passes a channel whose driver it does not check individually', function () {
+    // syslog is configured, so it is a channel - only an unconfigured name is a failure
+    fakeApi([fakeServer()]);
+    fakeBinaries(['*--version*' => Process::result(output: 'some tool v1.2.3')]);
+    config(['logging.default' => 'syslog']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('[ ok ] log channel (syslog)');
+});
+
 it('still fails a remote rclone cannot reach or does not know', function () {
     // exit 1 is a remote name missing from the config, a refused login, no network - so
     // treating exit 3 as reachable must not widen to every non-zero exit

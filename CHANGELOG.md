@@ -10,6 +10,12 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`app:validate` fails a log channel that is not configured.** It reported one as
+  `[ ok ] log channel (x)  unknown driver`, so a stack naming a channel that does not exist
+  passed the check a deployment gates on — while Laravel answered every record with its
+  emergency logger, in a file this tool does not mention. `LOG_CHANNEL=null` is the way in:
+  the word `null` reaches the config as no value at all, and an empty default becomes the
+  channel name `default`, which nothing defines.
 - **`LOG_STACK=null` no longer turns logging off in a way nothing reports.** It is the value
   `.env.example` documents, but the framework reads the literal word `null` as no value at all,
   leaving a stack holding one channel with no name. Laravel cannot build that, so every record
