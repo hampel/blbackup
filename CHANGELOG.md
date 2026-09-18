@@ -6,6 +6,15 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Moved to `hampel/binarylane-api-laravel` 0.7.0** (`hampel/binarylane-api` 0.6.0), from
+  0.6.0. The changes are to DNS records, which this tool does not use. An API request that gets
+  no answer now says that whether it was carried out is unknown, where it named only the
+  transport error. Both API timeouts still apply.
+
 ## [2.7.2] - 2026-09-16
 
 ### Fixed
@@ -487,6 +496,7 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.7.2...HEAD
 [2.7.2]: https://github.com/hampel/blbackup/compare/2.7.1...2.7.2
 [2.7.1]: https://github.com/hampel/blbackup/compare/2.7.0...2.7.1
 [2.7.0]: https://github.com/hampel/blbackup/compare/2.6.0...2.7.0

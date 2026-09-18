@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "14eede5f8407f806e664f52e32d15aa0",
+    "content-hash": "d81687819649598be17aac460ba649eb",
     "packages": [
         {
             "name": "brick/math",
@@ -911,16 +911,16 @@
         },
         {
             "name": "hampel/binarylane-api",
-            "version": "0.5.0",
+            "version": "0.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hampel/binarylane-api.git",
-                "reference": "2d6b6b0bbddc709547dd47537ad473a6af02bec5"
+                "reference": "f8d0f9e903cf842df9cd54d5fbc0216d36179617"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hampel/binarylane-api/zipball/2d6b6b0bbddc709547dd47537ad473a6af02bec5",
-                "reference": "2d6b6b0bbddc709547dd47537ad473a6af02bec5",
+                "url": "https://api.github.com/repos/hampel/binarylane-api/zipball/f8d0f9e903cf842df9cd54d5fbc0216d36179617",
+                "reference": "f8d0f9e903cf842df9cd54d5fbc0216d36179617",
                 "shasum": ""
             },
             "require": {
@@ -976,26 +976,26 @@
                 "issues": "https://github.com/hampel/binarylane-api/issues",
                 "source": "https://github.com/hampel/binarylane-api"
             },
-            "time": "2026-09-14T08:43:12+00:00"
+            "time": "2026-09-18T06:08:38+00:00"
         },
         {
             "name": "hampel/binarylane-api-laravel",
-            "version": "0.6.0",
+            "version": "0.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hampel/binarylane-api-laravel.git",
-                "reference": "56ee356baebda6b5141ffcef49b7e99f0571f911"
+                "reference": "d9787318a4c21379762c954640dca81928793f90"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hampel/binarylane-api-laravel/zipball/56ee356baebda6b5141ffcef49b7e99f0571f911",
-                "reference": "56ee356baebda6b5141ffcef49b7e99f0571f911",
+                "url": "https://api.github.com/repos/hampel/binarylane-api-laravel/zipball/d9787318a4c21379762c954640dca81928793f90",
+                "reference": "d9787318a4c21379762c954640dca81928793f90",
                 "shasum": ""
             },
             "require": {
                 "guzzlehttp/guzzle": "^7.8|^8.0",
                 "guzzlehttp/psr7": "^2.0|^3.0",
-                "hampel/binarylane-api": "^0.5",
+                "hampel/binarylane-api": "^0.6",
                 "illuminate/contracts": "^12.0|^13.0",
                 "illuminate/http": "^12.0|^13.0",
                 "illuminate/support": "^12.0|^13.0",
@@ -1059,7 +1059,7 @@
                 "issues": "https://github.com/hampel/binarylane-api-laravel/issues",
                 "source": "https://github.com/hampel/binarylane-api-laravel"
             },
-            "time": "2026-09-14T09:04:48+00:00"
+            "time": "2026-09-18T06:25:18+00:00"
         },
         {
             "name": "hampel/console-report",
