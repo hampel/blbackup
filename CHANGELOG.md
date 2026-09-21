@@ -8,6 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`KEEPLEAST_DAYS`, a floor under `KEEPONLY_DAYS`.** `clean` keeps the most recent
+  `KEEPLEAST_DAYS` days of each server's backups whatever their age, locally and on the
+  remote, so a server that stops being backed up keeps its last good backups rather than
+  having them expire with the rest. Counted in days rather than files, per server
+  directory. Defaults to `3`; `0` expires strictly by age, as before. It only ever
+  prevents a deletion, so on an install backing up nightly with the default retention it
+  changes nothing.
+
 ### Changed
 
 - **Moved to `hampel/binarylane-api-laravel` 0.7.0** (`hampel/binarylane-api` 0.6.0), from

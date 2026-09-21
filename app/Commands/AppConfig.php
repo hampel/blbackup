@@ -66,6 +66,7 @@ class AppConfig extends Command
                 'API Connect Timeout' => (string) config('binarylane.connect_timeout'),
                 'Download Timeout' => (string) config('blbackup.timeout'),
                 'Keep Only Days' => (string) config('blbackup.keeponly_days'),
+                'Keep Least Days' => (string) config('blbackup.keepleast_days'),
                 'Include File' => $this->optionalPath(config('blbackup.include_file')),
                 'Exclude File' => $this->optionalPath(config('blbackup.exclude_file')),
                 'Lock File' => $this->path(app(BackupLock::class)->path()),

@@ -66,6 +66,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Keepleast days
+    |--------------------------------------------------------------------------
+    |
+    | Days of each server's backups that clean keeps whatever their age - a floor under
+    | keeponly_days, so a server that stops being backed up does not have its last good
+    | backups expired along with the rest. Counted in days rather than files. Set to 0
+    | to expire strictly by age.
+    */
+
+    'keepleast_days' => env('KEEPLEAST_DAYS', 3),
+
+    /*
+    |--------------------------------------------------------------------------
     | Lock file
     |--------------------------------------------------------------------------
     |

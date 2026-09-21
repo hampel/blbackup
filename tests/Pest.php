@@ -56,6 +56,10 @@ uses(Tests\TestCase::class)
             'blbackup.rclone.remote' => 'remote:backups',
             'blbackup.lock_file' => storage_path('framework/testing/blbackup.lock'),
 
+            // expire strictly by age unless a test is about the floor - most clean
+            // fixtures are one server's backups, which the floor would hold back
+            'blbackup.keepleast_days' => 0,
+
             // no server list unless a test asks for one - the project .env is
             // loaded here too, and a developer who has configured one would
             // otherwise find every test filtering its server list

@@ -37,13 +37,15 @@ class Clean extends BaseCommand
     public function handle()
     {
         $keeponly = intval($this->option('days') ?? config('blbackup.keeponly_days'));
+        $keepleast = max(0, intval(config('blbackup.keepleast_days')));
         $path = Storage::disk('downloads')->path('');
 
         $this->log(
             'notice',
-            "Cleaning up old backups from [{$path}] older than {$keeponly} days",
+            "Cleaning up old backups from [{$path}] older than {$keeponly} days,"
+                . " keeping the most recent {$keepleast} days of each server",
             "Cleaning up old backups",
-            compact('path', 'keeponly')
+            compact('path', 'keeponly', 'keepleast')
         );
 
         if ($this->option('dry-run'))
@@ -74,10 +76,12 @@ class Clean extends BaseCommand
 
         $cutoff = Carbon::now()->subDays($keeponly)->timestamp;
 
-        collect(Storage::disk('downloads')->allFiles(''))
-            ->reject(function ($path) use ($cutoff) {
-                return Storage::disk('downloads')->lastModified($path) > $cutoff;
-            })
+        $local = collect(Storage::disk('downloads')->allFiles(''))
+            ->mapWithKeys(function ($path) {
+                return [$path => Storage::disk('downloads')->lastModified($path)];
+            });
+
+        $this->expired($local, $cutoff, $keepleast, 'downloads')
             ->tap(function (Collection $collection) {
                 if ($collection->count() === 0)
                 {
@@ -153,14 +157,18 @@ class Clean extends BaseCommand
 
             $verbosity = $this->getVerbosity();
 
-            $failed = collect($files)
-                ->reject(function ($file) use ($cutoff) {
+            $remote = collect($files)
+                // directories are dropped before their times are parsed at all
+                ->reject(fn ($file) => $file['IsDir'])
+                ->mapWithKeys(function ($file) {
                     // rclone emits RFC3339 with nanosecond precision, and some
                     // backends use Z rather than an offset - too variable for a
                     // fixed format string, which threw rather than failing the
-                    // command. Directories are rejected before parsing at all.
-                    return $file['IsDir'] || Carbon::parse($file['ModTime'])->timestamp > $cutoff;
-                })
+                    // command
+                    return [$file['Path'] => Carbon::parse($file['ModTime'])->timestamp];
+                });
+
+            $failed = $this->expired($remote, $cutoff, $keepleast, 'remote filesystem')
                 ->tap(function (Collection $collection) {
                     if ($collection->count() === 0)
                     {
@@ -174,9 +182,7 @@ class Clean extends BaseCommand
                 // reject rather than each, so one failed deletion doesn't stop
                 // the run and what is left is the files still on the remote.
                 // A return from inside each() only returns from the closure.
-                ->reject(function ($file) use ($rclone, $remotePath, $verbosity) {
-
-                    $path = $file['Path'];
+                ->reject(function ($path) use ($rclone, $remotePath, $verbosity) {
 
                     if ($this->option('dry-run'))
                     {
@@ -225,7 +231,7 @@ class Clean extends BaseCommand
                     'error',
                     "{$failed->count()} old backup file(s) could not be deleted from the remote filesystem",
                     "Old backup files could not be deleted from the remote filesystem",
-                    ['count' => $failed->count(), 'files' => $failed->pluck('Path')->all()]
+                    ['count' => $failed->count(), 'files' => $failed->all()]
                 );
 
                 return self::FAILURE;
@@ -233,6 +239,67 @@ class Clean extends BaseCommand
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The backups old enough to delete, less the ones the floor holds back
+     *
+     * Age on its own eventually leaves nothing at all. A server that stops being backed
+     * up - deleted, renamed, excluded, or failing every night - has its last good
+     * backups expired along with the rest once they pass the retention period, and that
+     * is found out when one is needed. So the most recent days of each server's backups
+     * are kept whatever their age. Counted in days rather than files, so a second backup
+     * taken by hand is not a second day of cover, and per server - the first directory
+     * of the path - so one server that stopped keeps its own last backups while the
+     * others expire normally. It only ever prevents a deletion.
+     *
+     * @param Collection $modified backup file path => modification timestamp
+     * @return Collection the paths to delete
+     */
+    protected function expired(Collection $modified, int $cutoff, int $keepleast, string $where) : Collection
+    {
+        $held = $modified
+            ->groupBy(fn ($timestamp, $path) => $this->serverOf($path), true)
+            ->flatMap(function (Collection $server) use ($keepleast) {
+                $days = $server->map(fn ($timestamp) => $this->backupDate($timestamp))
+                    ->unique()
+                    ->sortDesc()
+                    ->take($keepleast);
+
+                return $server->filter(fn ($timestamp) => $days->contains($this->backupDate($timestamp)))
+                    ->keys();
+            });
+
+        return $modified
+            ->filter(fn ($timestamp) => $timestamp <= $cutoff)
+            ->keys()
+            ->reject(function ($path) use ($held, $keepleast, $where) {
+                if (!$held->contains($path))
+                {
+                    return false;
+                }
+
+                $this->log(
+                    'info',
+                    "Keeping old backup file in {$where} [{$path}] - it is among the most recent"
+                        . " {$keepleast} days of backups for its server",
+                    "Keeping old backup file as one of the most recent for its server",
+                    compact('path', 'keepleast')
+                );
+
+                return true;
+            })
+            ->values();
+    }
+
+    protected function serverOf(string $path) : string
+    {
+        return str_contains($path, '/') ? strstr($path, '/', true) : '';
+    }
+
+    protected function backupDate(int $timestamp) : string
+    {
+        return Carbon::createFromTimestamp($timestamp, config('blbackup.timezone'))->toDateString();
     }
 
     /**

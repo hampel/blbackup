@@ -37,7 +37,8 @@ create  →  download  →  check  →  move  →  clean
 2. **download** fetches the image over the temporary link, as a `.zst` file.
 3. **check** runs `zstd --test` over it. A file that fails is deleted, not kept.
 4. **move** hands it to `rclone` for secondary storage.
-5. **clean** expires anything older than `KEEPONLY_DAYS`, locally and remotely.
+5. **clean** expires anything older than `KEEPONLY_DAYS`, locally and remotely — except
+   the most recent `KEEPLEAST_DAYS` days of each server's backups.
 
 The commands call each other rather than sharing code, so each stage can also be
 run on its own — but for an unattended run there is one command that does all of
@@ -143,6 +144,7 @@ is the way to check a `.env` took effect.
 | `DOWNLOAD_PATH` | `storage/backups` | Where images land |
 | `DOWNLOAD_TIMEOUT` | `3600` | Seconds to wait for a backup to be taken |
 | `KEEPONLY_DAYS` | `7` | What `clean` expires |
+| `KEEPLEAST_DAYS` | `3` | Days of each server's backups `clean` keeps whatever their age. `0` turns it off |
 | `LOCK_FILE` | storage path | See [The lock](#the-lock) — **must be on a shared mount in a container** |
 | `WGET_BINARY` | `/usr/bin/wget` | |
 | `ZSTD_BINARY` | `/usr/bin/zstd` | |
@@ -210,6 +212,20 @@ stages themselves.
 
 **`clean`** asks before it deletes anything, unless `--dry-run` or
 `--no-interaction`. `--days` overrides `KEEPONLY_DAYS` for one run.
+
+Underneath that sits a floor: the most recent `KEEPLEAST_DAYS` days of each server's
+backups are kept whatever their age, locally and on the remote. Age on its own
+eventually leaves nothing — a server that stops being backed up, because it was
+excluded, renamed or has failed every night for a week, has its last good backups
+expired along with the rest, and you find out when you need one. The floor only ever
+*prevents* a deletion, so it can never remove something age would have kept, and
+`--days` does not move it.
+
+It counts days rather than files, so a backup taken by hand on the same day as the
+nightly one is one day of cover, not two. A server is the directory its backups sit
+in, so a server that has been renamed is two servers here, and the old name keeps its
+last backups until you delete them. Set it to `0` to expire strictly by age; `clean -v`
+names each file it held back.
 
 **`download`** defaults to `wget`. `--no-wget` switches to an in-process HTTP
 download instead. A file whose size does not exactly match the API's figure is

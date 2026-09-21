@@ -351,7 +351,7 @@ built from `Storage::disk('downloads')->path(…)`.
 ## Configuration and packaging
 
 Everything app-specific is env-driven through `config/blbackup.php` — download
-timeout, the three binary paths, `keeponly_days`, the rclone remote, and the
+timeout, the three binary paths, `keeponly_days` and `keepleast_days`, the rclone remote, and the
 timezone. Read it through `config()`, never `env()` outside `config/`.
 `.env.example` documents every variable with its default; `.env` itself is
 gitignored, and `app:config` is the way to see what a given install resolved to.
@@ -558,7 +558,9 @@ the request, and the state of the `downloads` disk afterwards.
 client's account and token in a `beforeEach` chained onto `uses()`, so assertions
 don't depend on the developer's `.env` — it also forces `logging.default` to `null`, since the
 project `.env` is loaded during tests and the suite would otherwise append to
-whatever log the developer has configured. `Storage::fake('downloads')` repoints
+whatever log the developer has configured. It pins `blbackup.keepleast_days` to 0 as
+well: nearly every `clean` fixture is one server's backups, which the floor would hold
+back, so the tests that are about the floor set it themselves. `Storage::fake('downloads')` repoints
 the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /
 `fakeImage()` build API payloads, `fakeApi()` answers every BinaryLane endpoint
 by routing on the request path — lists with a `meta.total`, a missing server or
