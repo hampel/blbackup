@@ -61,10 +61,17 @@ read-only, because rclone rewrites it when it refreshes an OAuth token.
 ```bash
 git clone https://github.com/hampel/blbackup.git
 cd blbackup
+git checkout "$(git describe --tags --abbrev=0)"   # the latest release, not master
 cp .env.example .env      # then edit it
-docker compose build
+VERSION=$(git describe --tags --abbrev=0) docker compose build
 docker compose run --rm blbackup php blbackup app:validate
 ```
+
+**The `VERSION=` prefix is what tells the image which release it is.** An image has no `.git`
+directory and no git binary, so it cannot work its own version out the way a checkout does.
+Without the prefix it calls itself `unreleased` — in `--version`, in `app:config`, and on every
+Slack run summary it signs, so the channel no longer says which build sent an alert.
+`app:validate` warns when it was left off.
 
 Paths in `.env` name the **container** side of a mount: `DOWNLOAD_PATH=/downloads`,
 not the host directory it maps to.
@@ -78,6 +85,43 @@ expire an empty directory while the real backups kept ageing, with every run
 reporting success. **Both directories must already exist:** a path that does
 not is refused rather than created, so a typo stops the run instead of quietly
 becoming an empty directory the backups go into.
+
+### Upgrading a container
+
+Rebuilding is the whole of an upgrade: the image is built from the checkout, and `.env` is not in
+git, so checking out a new release leaves your settings alone. From the directory holding the
+clone:
+
+```bash
+git fetch --tags
+git checkout "$(git describe --tags --abbrev=0 origin/master)"
+VERSION=$(git describe --tags --abbrev=0) docker compose build
+docker compose run --rm blbackup php blbackup --version
+docker compose run --rm blbackup php blbackup app:validate
+```
+
+**Read the [changelog](CHANGELOG.md) before the build, not after.** An upgrade that needs a new
+setting in `.env` says so there. Adding a setting before you rebuild does no harm, because an older
+version ignores a key it does not read. Adding it afterwards can cost you a run.
+
+**`--version` should print the release you checked out.** If it prints `unreleased`, the `VERSION=`
+prefix did not reach the build, and the fix is to build again with it.
+
+**`app:validate` is the gate.** It exits non-zero if the image cannot do what `.env` says, so do
+not leave a rebuild in place that failed it. It posts to Slack if a webhook is configured, which
+is deliberate; see [Validating an install](#validating-an-install).
+
+**The checkout is a release tag, so the clone is on a detached HEAD**, and `git pull` refuses
+to run there. That is why the steps fetch and check out instead. Building from `master` would label
+unreleased commits with the last tag's version.
+
+**To roll back, check out the older tag and build again the same way:**
+
+```bash
+git checkout 2.7.2
+VERSION=$(git describe --tags --abbrev=0) docker compose build
+docker compose run --rm blbackup php blbackup app:validate
+```
 
 ### As a compiled binary
 
