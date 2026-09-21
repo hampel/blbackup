@@ -1,6 +1,6 @@
 # blbackup runs as a one-shot container, driven by cron on the host.
 #
-#   docker compose build
+#   VERSION=$(git describe --tags --abbrev=0) docker compose build
 #   docker compose run --rm blbackup php blbackup app:validate
 #
 # Everything specific to an installation - the API token, the rclone config,
