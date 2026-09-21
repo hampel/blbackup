@@ -230,6 +230,11 @@ blbackup app:validate [--offline] [--unattended] [--no-api] [-d|--download=URL]
 per line, matched against the server name. Lines are trimmed, so a list edited on
 Windows still matches.
 
+**The lists apply only to `--all`.** They say which servers an unattended run covers, so
+`create db1.example.com` backs up that server even if the exclude list names it, and a
+list file that has gone missing does not stop it. Giving `--include` or `--exclude`
+alongside a named server does nothing, and the command says so.
+
 **Prefer configuring them.** `INCLUDE_FILE` and `EXCLUDE_FILE` set the same
 paths, and the options override them for one run. A list that only ever appears
 on the crontab line cannot be shown by `app:config` or checked by `app:validate`,

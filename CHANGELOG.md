@@ -6,6 +6,17 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The include and exclude lists apply only to `--all`.** A server named on the command
+  line — `create <server>`, `download <server>` — was filtered through them too, so the
+  excluded server, the one most likely to be backed up by hand, could not be: the command
+  did nothing and exited 0. A named server now ignores both lists, and does not read them,
+  so a missing list file no longer stops it. `--include` or `--exclude` given with a
+  named server says it is ignored. `cron` is unaffected: it runs `--all`.
+
 ## [2.8.0] - 2026-09-21
 
 ### Added

@@ -40,7 +40,8 @@ php blbackup app:build blbackup  # compile a PHAR into builds/ (box.json)
 
 `--include` / `--exclude` take a path to a plain-text file, one server hostname
 per line, filtered against the server's `name`, and default to
-`blbackup.include_file` / `blbackup.exclude_file` when the option is absent.
+`blbackup.include_file` / `blbackup.exclude_file` when the option is absent. They
+filter `--all` only; a server named on the command line never reads them.
 `clean` prompts for confirmation unless `--dry-run` or `--no-interaction`.
 
 ## The pipeline
@@ -268,7 +269,14 @@ already-downloaded case and a re-run of `download --all` reports trouble every
 night, which is the failure mode that makes an exit code worth nothing.
 
 **`BaseCommand::serverList('include'|'exclude')`** resolves the server lists for
-`create` and `download`, which had the same twenty lines twice. The option wins
+`create` and `download`, which had the same twenty lines twice, and
+`applyServerLists()` applies them — **to `--all` only**. A server named on the
+command line is somebody asking for that one, and the excluded server is exactly the
+one people back up by hand; filtering it too turned `download <excluded server>` into
+a run that did nothing and succeeded (changed 2026-09-21). A named server does not
+read the lists at all, so a broken list path cannot block it either. `create --all
+--download` calls `download` per server by id, which is therefore unfiltered — it
+was filtered once already, by `create`. The option wins
 for one run; `blbackup.include_file` / `blbackup.exclude_file` is what an
 unattended install is read out of, and exists so that `app:config` can show the
 list and `app:validate` can check it — a path that lives only on the crontab line

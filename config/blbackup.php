@@ -105,6 +105,8 @@ return [
     | Paths to plain-text files naming servers to back up, one hostname per
     | line, matched against the server's name. An include list backs up only
     | the servers it names; an exclude list backs up everything but those.
+    | Only --all is filtered: a server named on the command line is backed up
+    | whatever the lists say, and they are not read at all.
     |
     | Neither is set by default, which means no filtering - every server on the
     | account is backed up. That is not an error and app:validate does not treat

@@ -352,3 +352,52 @@ it('records why a backup failed, since the client no longer does', function () {
             && $context['reason'] !== ''
     );
 });
+
+/*
+| The lists say which servers an unattended run covers. A server named on the command
+| line is somebody asking for that one, and an excluded server is exactly the one people
+| back up by hand - so only --all is filtered.
+*/
+
+it('backs up a server named on the command line even though the exclude list names it', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['blbackup.exclude_file' => writeServerList('exclude.txt', ['db1.example.com'])]);
+
+    $this->artisan('create', ['server' => 'db1.example.com'])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(200));
+});
+
+it('backs up a server named by id even though the include list leaves it out', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['blbackup.include_file' => writeServerList('include.txt', ['web1.example.com'])]);
+
+    $this->artisan('create', ['server' => '200'])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(200));
+});
+
+it('does not read the lists for a named server, so a missing one cannot block it', function () {
+    fakeApi([$this->server, $this->other]);
+
+    config(['blbackup.exclude_file' => '/no/such/list.txt']);
+
+    $this->artisan('create', ['server' => 'db1.example.com'])->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(200));
+});
+
+it('says an --exclude given with a named server is ignored', function () {
+    fakeApi([$this->server, $this->other]);
+
+    $this->artisan('create', [
+        'server' => 'db1.example.com',
+        '--exclude' => writeServerList('exclude.txt', ['db1.example.com']),
+    ])
+        ->expectsOutputToContain('--exclude applies only with --all, so it is ignored for a named server')
+        ->assertSuccessful();
+
+    Http::assertSent(backupWasRequestedFor(200));
+});

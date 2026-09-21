@@ -86,6 +86,8 @@ class Download extends BaseCommand
             if (empty($servers)) {
                 $this->fail("No server data returned for {$hostnameOrServerId}");
             }
+
+            $servers = $this->applyServerLists($servers);
         }
         elseif (empty($hostnameOrServerId))
         {
@@ -96,10 +98,14 @@ class Download extends BaseCommand
         }
         elseif (is_numeric($hostnameOrServerId))
         {
+            $this->ignoreServerListOptions();
+
             $servers = [$this->binarylane->servers()->get((int) $hostnameOrServerId)];
         }
         else
         {
+            $this->ignoreServerListOptions();
+
             $servers = $this->serversNamed($hostnameOrServerId);
 
             if (empty($servers)) {
@@ -107,16 +113,7 @@ class Download extends BaseCommand
             }
         }
 
-        $includeServers = $this->serverList('include');
-        $excludeServers = $this->serverList('exclude');
-
         $failed = collect($servers)
-            ->filter(function (Server $server) use ($includeServers) {
-                return $includeServers ? in_array($server->name, $includeServers) : true;
-            })
-            ->reject(function (Server $server) use ($excludeServers) {
-                return $excludeServers ? in_array($server->name, $excludeServers) : false;
-            })
             // reject rather than each, so one server that fails doesn't stop the
             // run and what is left is the servers with no backup in place
             ->reject(function (Server $server) {

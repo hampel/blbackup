@@ -62,6 +62,8 @@ class Create extends BaseCommand
                 $this->fail("No hostname or server_id specified. Specify --all option to back up all servers");
             }
 
+            $this->ignoreServerListOptions();
+
             if (is_numeric($hostnameOrServerId))
             {
                 // $hostname is server_id - an id that is not on the account raises,
@@ -88,19 +90,12 @@ class Create extends BaseCommand
                 $this->fail("No server data returned");
             }
 
+            $servers = $this->applyServerLists($servers);
+
             $this->log('notice', "Backing up all servers");
         }
 
-        $includeServers = $this->serverList('include');
-        $excludeServers = $this->serverList('exclude');
-
         $failed = collect($servers)
-            ->filter(function (Server $server) use ($includeServers) {
-                return $includeServers ? in_array($server->name, $includeServers) : true;
-            })
-            ->reject(function (Server $server) use ($excludeServers) {
-                return $excludeServers ? in_array($server->name, $excludeServers) : false;
-            })
             // reject rather than each, so one server that fails doesn't stop
             // the run and what is left is the servers that were not backed up
             ->reject(function (Server $server) {

@@ -285,6 +285,46 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * The servers --all should work through, after the include and exclude lists.
+     *
+     * Only --all is filtered. The lists say which servers an unattended run covers;
+     * naming a server on the command line is somebody asking for that one, and a
+     * list that refused it - an excluded server being exactly the one people back
+     * up by hand - would turn the request into a silent no-op. So a named server
+     * never reads the lists at all, which also means a missing list file cannot
+     * block it.
+     *
+     * @param list<Server> $servers
+     * @return list<Server>
+     */
+    protected function applyServerLists(array $servers) : array
+    {
+        $include = $this->serverList('include');
+        $exclude = $this->serverList('exclude');
+
+        return collect($servers)
+            ->filter(fn (Server $server) => $include ? in_array($server->name, $include) : true)
+            ->reject(fn (Server $server) => $exclude ? in_array($server->name, $exclude) : false)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Say so when --include or --exclude was given with a named server, since it
+     * does nothing there and the operator plainly expected it to.
+     */
+    protected function ignoreServerListOptions() : void
+    {
+        foreach (['include', 'exclude'] as $which)
+        {
+            if ($this->option($which))
+            {
+                $this->line("--{$which} applies only with --all, so it is ignored for a named server");
+            }
+        }
+    }
+
+    /**
      * Every server on the account, across every page.
      *
      * Walked with each() rather than read from one list() call, and that is the

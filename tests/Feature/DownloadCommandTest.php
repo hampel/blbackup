@@ -339,3 +339,42 @@ it('refuses a disk that only offers the raw image', function () {
 
     Process::assertNothingRan();
 });
+
+/*
+| Only --all is filtered by the server lists - see the same tests for create.
+*/
+
+it('downloads a server named on the command line even though the exclude list names it', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    config(['blbackup.exclude_file' => writeServerList('exclude.txt', ['web1.example.com'])]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+});
+
+it('downloads a server named by id even though the include list leaves it out', function () {
+    $other = fakeServer(['id' => 200, 'name' => 'db1.example.com']);
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    config(['blbackup.include_file' => writeServerList('include.txt', ['db1.example.com'])]);
+
+    $this->artisan('download', ['server' => (string) $this->server['id']])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+});
+
+it('does not read the lists for a named server, so a missing one cannot block the download', function () {
+    fakeOneBackup($this->server, $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    config(['blbackup.include_file' => '/no/such/list.txt']);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+});
