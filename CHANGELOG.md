@@ -6,6 +6,16 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`app:validate` checks the two retention settings.** `KEEPONLY_DAYS` and `KEEPLEAST_DAYS`
+  reach `clean` through `intval()`, so a value that is not a whole number means `0` — which
+  expires every backup past the floor, or removes the floor. Both now fail the gate, naming
+  the variable and the number `clean` would read. `KEEPLEAST_DAYS=0` written out reports as a
+  skip rather than a failure.
+
 ## [2.8.1] - 2026-09-21
 
 ### Changed

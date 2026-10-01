@@ -844,3 +844,64 @@ it('still fails a remote rclone cannot reach or does not know', function () {
     expect($exit)->toBe(1)->and($output)->toContain('[fail] rclone remote');
 });
 
+
+/*
+| The retention settings are read with intval(), so a typo means 0 - and 0 expires every
+| backup past the floor, or removes the floor. Nothing else catches it before `clean` runs.
+*/
+
+it('fails a retention period that is not a whole number', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keeponly_days' => 'abc']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] backup expiry')
+        ->toContain('KEEPONLY_DAYS is [abc], which clean reads as 0 days');
+});
+
+it('fails a retention period of zero, which expires everything', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keeponly_days' => '0']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)->and($output)->toContain('[fail] backup expiry');
+});
+
+it('fails a floor that is not a whole number', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keepleast_days' => '3 days']);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(1)
+        ->and($output)->toContain('[fail] expiry floor')
+        ->toContain('nothing is held back');
+});
+
+it('reports a floor turned off as a skip rather than a pass', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keepleast_days' => 0]);
+
+    [$exit, $output] = validate();
+
+    // 0 written out is a decision, so it is not a failure - but it is not a pass either
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[    ] expiry floor')
+        ->toContain('backups expire strictly by age');
+});
+
+it('reports the retention settings it would use', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keeponly_days' => 7, 'blbackup.keepleast_days' => 3]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[ ok ] backup expiry')
+        ->toContain('backups are deleted after 7 days')
+        ->toContain('[ ok ] expiry floor')
+        ->toContain('the most recent 3 days of each server are always kept');
+});

@@ -255,6 +255,8 @@ writes a log record at every level, sends a test run summary and calls the API. 
 `[ ok ]`, `[warn]`, `[fail]` or blank (not applicable). Any failure exits non-zero.
 
 - `--download=<url>` also downloads a real URL.
+- It fails a `KEEPONLY_DAYS` or `KEEPLEAST_DAYS` that is not a whole number, since `clean`
+  reads one as `0` — expiring every backup, or keeping none back.
 - **It posts to Slack.** Warn anyone else watching the channel first. It prints how many records
   it posted — four at `error` — plus one if the summary shares the webhook.
 - It warns if `LOG_SLACK_LEVEL` is above `error`, since the channel would then never post.

@@ -420,6 +420,14 @@ rather than choosing a file; don't report `environmentFilePath()` directly, whic
 names a path inside the archive from a compiled binary whether or not anything is
 there.
 
+**The retention settings are validated on the value as written, not after `intval()`.**
+`checkRetention()` fails a `KEEPONLY_DAYS` or `KEEPLEAST_DAYS` that is not a whole number,
+because both reach `clean` through `intval()` — `abc` becomes 0, which expires every backup
+past the floor or removes the floor itself, and `app:config` prints the typo without saying
+what it means. The test has to run before the cast or an explicit `0` cannot be told from a
+typo, which is why `isWholeNumber()` takes the raw config value; `KEEPLEAST_DAYS=0` written
+out reports as a skip, since no floor is then what was asked for.
+
 **Logging still resolves to nothing until `LOG_STACK` is set.** `logging.default`
 is `stack`, but the stack's own channel list defaults to `null`, which discards
 everything — so an install that sets neither is silent, and `app:validate` warns

@@ -121,6 +121,7 @@ class AppValidate extends BaseCommand
         $this->checkSection("Storage");
         $this->checkStoragePath();
         $this->checkDownloadPath();
+        $this->checkRetention();
         $this->checkLock();
         $this->checkLogging();
 
@@ -274,6 +275,73 @@ class AppValidate extends BaseCommand
         {
             $this->reportOk("Free space", $this->formatBytes($free));
         }
+    }
+
+    /**
+     * The two settings that decide what `clean` deletes.
+     *
+     * Both are read with intval(), so a value that is not a whole number means 0 - and 0
+     * is destructive in both of them. KEEPONLY_DAYS=0 puts the cutoff at this moment, so
+     * every backup older than today is expired on the next unattended run; KEEPLEAST_DAYS=0
+     * removes the floor that would otherwise have held the last few days of each server
+     * back. Nothing else here catches it: `app:config` prints the value as typed, which
+     * only helps somebody already reading it, and `clean` prints the number it resolved to -
+     * under cron, into a log nobody reads until the backups have gone.
+     *
+     * A fail rather than a warn, because the cost is deleted backups and because 0 has a
+     * spelling of its own: a value that is not a whole number is a typo, not a decision.
+     * KEEPLEAST_DAYS=0 written out is a decision, and reports as a skip - there is then no
+     * floor, which is what was asked for.
+     */
+    protected function checkRetention() : void
+    {
+        $keeponly = config('blbackup.keeponly_days');
+        $keepleast = config('blbackup.keepleast_days');
+
+        if (!$this->isWholeNumber($keeponly) || (int) $keeponly < 1)
+        {
+            $this->reportFail('backup expiry', sprintf(
+                'KEEPONLY_DAYS is [%s], which clean reads as %d days'
+                    . ' - every backup older than that is expired',
+                $keeponly,
+                (int) $keeponly
+            ));
+        }
+        else
+        {
+            $this->reportOk('backup expiry', "backups are deleted after {$keeponly} days");
+        }
+
+        if (!$this->isWholeNumber($keepleast))
+        {
+            $this->reportFail('expiry floor', sprintf(
+                'KEEPLEAST_DAYS is [%s], which clean reads as 0 days'
+                    . ' - nothing is held back, so a server that stops being backed up loses'
+                    . ' its last backups',
+                $keepleast
+            ));
+        }
+        elseif ((int) $keepleast === 0)
+        {
+            $this->reportSkip('expiry floor', 'KEEPLEAST_DAYS is 0 - backups expire strictly by age');
+        }
+        else
+        {
+            $this->reportOk('expiry floor', "the most recent {$keepleast} days of each server are always kept");
+        }
+    }
+
+    /**
+     * Whether a setting is a whole number, judged on the value as written.
+     *
+     * The test has to be made before intval() sees it: 'abc', '7.5' and '-1' all become
+     * an int that looks deliberate, and an explicit 0 is then indistinguishable from a
+     * typo. A value arrives either as the string from the environment or as the int
+     * default in config/.
+     */
+    protected function isWholeNumber(mixed $value) : bool
+    {
+        return is_int($value) || (is_string($value) && preg_match('/^[0-9]+$/', trim($value)) === 1);
     }
 
     /**
