@@ -283,8 +283,11 @@ class Clean extends BaseCommand
                     'info',
                     "Keeping old backup file in {$where} [{$path}] - it is among the most recent"
                         . " {$keepleast} days of backups for its server",
+                    // the message stays constant so the records group as one thing, and
+                    // 'where' goes in the context - without it a file held back locally and
+                    // the same relative path held back on the remote write identical records
                     "Keeping old backup file as one of the most recent for its server",
-                    compact('path', 'keepleast')
+                    compact('path', 'keepleast', 'where')
                 );
 
                 return true;

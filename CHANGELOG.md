@@ -16,6 +16,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the variable and the number `clean` would read. `KEEPLEAST_DAYS=0` written out reports as a
   skip rather than a failure.
 
+### Fixed
+
+- **A backup `clean` held back names which side it was on.** The record said a file had been
+  kept as one of the most recent for its server, but carried only the path, so the local disk
+  and the rclone remote wrote identical records for the same relative path. The console line
+  always said which; the log now does too, in the context.
+
 ## [2.8.1] - 2026-09-21
 
 ### Changed

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -183,10 +184,20 @@ it('keeps the most recent days of a server that stopped being backed up', functi
     putAgedDownload(backupPath(date: '20260731-003000', image: 110), daysAgo: 31);
     fakeBinaries();
 
+    Log::spy();
+
     $this->artisan('clean', ['-v' => true])
         ->expectsConfirmation(CONFIRMATION, 'yes')
         ->expectsOutputToContain("Keeping old backup file in downloads [{$this->old}]")
         ->assertSuccessful();
+
+    // which side it was held back on is in the context: the message is constant, so the
+    // records group as one thing, and the remote writes the same one
+    Log::shouldHaveReceived('log')->withArgs(
+        fn ($level, $message, $context) => $message === 'Keeping old backup file as one of the most recent for its server'
+            && ($context['where'] ?? null) === 'downloads'
+            && ($context['path'] ?? null) === $this->old
+    );
 
     // every one is past the retention period; only the oldest day is past the floor
     expect(Storage::disk('downloads')->exists($this->old))->toBeTrue()
