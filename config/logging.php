@@ -89,6 +89,13 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        // LOG_LEVEL defaults to debug, and that is settled rather than inherited: what
+        // this tool logs at debug is the wget, zstd and rclone command lines it is about
+        // to run, which is the first thing wanted when a backup has gone wrong overnight,
+        // and a tool run from a checkout has nowhere else to get them. The fleet policy
+        // that production runs at info is about the level an INSTALL sets in its .env -
+        // this is what a machine that has set nothing writes. .env.example documents this
+        // default, so the two change together or not at all.
         'single' => [
             'driver' => 'single',
             'path' => env('LOG_STORAGE_PATH', storage_path('blbackup.log')),

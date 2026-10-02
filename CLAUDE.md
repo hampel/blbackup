@@ -441,6 +441,14 @@ since the list is computed as config loads. A real install sets
 that it took — it writes a real record at every level rather than reporting that
 the file looks writable.
 
+**`LOG_LEVEL` defaults to `debug`, deliberately.** The debug records here are the external
+command lines — wget, zstd and rclone, URLs redacted — plus the per-poll backup progress, and
+the command lines are what a failed overnight run is read for. The fleet's "production runs at
+`info`" is about what an installation sets in its own `.env`; this default is what a machine
+that has set nothing writes. `config/logging.php` says so beside the setting, and
+`.env.example` documents the same value: changing one means changing both. Settled
+2026-10-03 — do not raise it again.
+
 **`app:validate` posts to Slack**, if a webhook is configured. That is
 deliberate and is why the levels are not behind a flag by default: a destination
 with a threshold only proves it works when something at that level is really
