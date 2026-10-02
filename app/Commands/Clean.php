@@ -270,7 +270,7 @@ class Clean extends BaseCommand
                     ->keys();
             });
 
-        return $modified
+        $expired = $modified
             ->filter(fn ($timestamp) => $timestamp <= $cutoff)
             ->keys()
             ->reject(function ($path) use ($held, $keepleast, $where) {
@@ -279,13 +279,15 @@ class Clean extends BaseCommand
                     return false;
                 }
 
+                // the file itself at debug, the count below at info: a loop reports its
+                // summary rather than its items, and the count is what is worth seeing
+                // nightly. 'where' goes in the context of both - without it a file held
+                // back locally and the same relative path held back on the remote write
+                // identical records
                 $this->log(
-                    'info',
+                    'debug',
                     "Keeping old backup file in {$where} [{$path}] - it is among the most recent"
                         . " {$keepleast} days of backups for its server",
-                    // the message stays constant so the records group as one thing, and
-                    // 'where' goes in the context - without it a file held back locally and
-                    // the same relative path held back on the remote write identical records
                     "Keeping old backup file as one of the most recent for its server",
                     compact('path', 'keepleast', 'where')
                 );
@@ -293,6 +295,21 @@ class Clean extends BaseCommand
                 return true;
             })
             ->values();
+
+        $count = $modified->filter(fn ($timestamp) => $timestamp <= $cutoff)->count() - $expired->count();
+
+        if ($count > 0)
+        {
+            $this->log(
+                'info',
+                "Keeping {$count} old backup file(s) in {$where} - among the most recent"
+                    . " {$keepleast} days of backups for their server",
+                "Keeping old backup files as among the most recent for their server",
+                ['count' => $count, 'keepleast' => $keepleast, 'where' => $where]
+            );
+        }
+
+        return $expired;
     }
 
     protected function serverOf(string $path) : string

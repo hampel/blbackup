@@ -186,15 +186,25 @@ it('keeps the most recent days of a server that stopped being backed up', functi
 
     Log::spy();
 
+    // -v for the count line; the files themselves are debug, so -vvv
     $this->artisan('clean', ['-v' => true])
         ->expectsConfirmation(CONFIRMATION, 'yes')
-        ->expectsOutputToContain("Keeping old backup file in downloads [{$this->old}]")
+        ->expectsOutputToContain('Keeping 2 old backup file(s) in downloads')
         ->assertSuccessful();
 
-    // which side it was held back on is in the context: the message is constant, so the
-    // records group as one thing, and the remote writes the same one
+    // the count at info, and which side it was on in the context of both: without it a
+    // file held back locally and the same relative path held back on the remote write
+    // identical records
     Log::shouldHaveReceived('log')->withArgs(
-        fn ($level, $message, $context) => $message === 'Keeping old backup file as one of the most recent for its server'
+        fn ($level, $message, $context) => $level === 'info'
+            && $message === 'Keeping old backup files as among the most recent for their server'
+            && ($context['count'] ?? null) === 2
+            && ($context['where'] ?? null) === 'downloads'
+    )->once();
+
+    Log::shouldHaveReceived('log')->withArgs(
+        fn ($level, $message, $context) => $level === 'debug'
+            && $message === 'Keeping old backup file as one of the most recent for its server'
             && ($context['where'] ?? null) === 'downloads'
             && ($context['path'] ?? null) === $this->old
     );

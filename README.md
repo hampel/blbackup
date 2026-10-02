@@ -188,7 +188,7 @@ stops being backed up keeps its last good ones:
 - A server is the directory its backups sit in, so a renamed server keeps its old backups until
   you delete them.
 - `--days` does not change it.
-- `clean -v` lists the files it kept.
+- `clean -v` says how many files it kept; `-vvv` lists them.
 
 ### download
 

@@ -401,3 +401,38 @@ it('says an --exclude given with a named server is ignored', function () {
 
     Http::assertSent(backupWasRequestedFor(200));
 });
+
+/*
+| The poll record fires every POLL_INTERVAL seconds for as long as BinaryLane takes, so it
+| is written only when the step changes - an unchanged step wrote the same record again,
+| burying the command lines debug is kept on for.
+*/
+
+it('logs the backup step only when it changes', function () {
+    $step = fn (string $detail, int $percent, string $status = 'in-progress') => array_merge(
+        fakeAction($status, $percent),
+        ['progress' => ['percent_complete' => $percent, 'current_step_detail' => $detail]]
+    );
+
+    fakeApi([$this->server], statuses: [
+        $step('Copying disk', 10),
+        $step('Copying disk', 40),
+        $step('Copying disk', 70),
+        $step('Compressing image', 90),
+        $step('Compressing image', 100, 'completed'),
+    ]);
+
+    Illuminate\Support\Facades\Log::spy();
+
+    $this->artisan('create', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    foreach (['Copying disk', 'Compressing image'] as $detail)
+    {
+        // Log::debug(), so the manager method is debug - not log(), which is what
+        // BaseCommand::log() calls
+        Illuminate\Support\Facades\Log::shouldHaveReceived('debug')->withArgs(
+            fn ($message, $context) => $message === 'Backup progress'
+                && ($context['current_step_detail'] ?? null) === $detail
+        )->once();
+    }
+});

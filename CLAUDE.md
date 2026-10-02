@@ -292,6 +292,12 @@ is genuinely surprising, which is why `app:validate` warns about it; nothing els
 on the machine would say a word. Lines are trimmed, because these files get
 edited on Windows and a CRLF list matches no hostname at all.
 
+**A loop logs its summary, not its items.** `clean` writes each file the floor held back at
+`debug` and one `info` record with the count, per side; `create`'s poll callback writes only
+when BinaryLane's step changes, because it fires every `POLL_INTERVAL` seconds for as long as
+a backup takes and wrote hundreds of identical records otherwise. The house policy is the
+`log-levels` skill, and these two are what it cost here.
+
 **`log($level, $message, $logMessage = null, $context = [])`** dual-writes: to
 Monolog (structured, with `$context`) and to the console (styled, gated by a
 level→verbosity map, so `debug` only appears under `-vvv`). Use it rather than

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -102,4 +103,28 @@ it('fails rather than running unlocked when the lock file cannot be opened', fun
         ->assertFailed();
 
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'wget'));
+});
+
+it('records that failure under a constant message, with the reason in context', function () {
+    $path = storage_path('framework/testing/unopenable.lock');
+
+    File::ensureDirectoryExists($path);
+
+    config(['blbackup.lock_file' => $path]);
+
+    fakeApi([fakeServer()]);
+    fakeBinaries();
+
+    Log::spy();
+
+    $this->artisan('cron', ['--no-clean' => true])->assertFailed();
+
+    // the exception's own text names the path, so as a message it varies per occurrence
+    // and the log store cannot count these as one thing
+    Log::shouldHaveReceived('log')->withArgs(
+        fn ($level, $message, $context) => $level === 'error'
+            && $message === 'Could not take the backup lock'
+            && str_contains($context['reason'] ?? '', 'Could not open lock file')
+            && ($context['lock'] ?? null) === $path
+    );
 });

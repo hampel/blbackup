@@ -69,7 +69,15 @@ trait LocksBackups
         {
             $this->lockFailure = $e->getMessage();
 
-            $this->log('error', $e->getMessage(), $e->getMessage(), ['lock' => $lock->path()]);
+            // a constant message with the detail in context, like every other record here:
+            // the exception's own text varies per occurrence, so the log store cannot group
+            // or count these as one thing
+            $this->log(
+                'error',
+                $e->getMessage(),
+                "Could not take the backup lock",
+                ['lock' => $lock->path(), 'reason' => $e->getMessage()]
+            );
 
             return false;
         }

@@ -16,8 +16,21 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the variable and the number `clean` would read. `KEEPLEAST_DAYS=0` written out reports as a
   skip rather than a failure.
 
+### Changed
+
+- **The backup-progress record is written only when the step changes.** It fired on every poll
+  of a running backup — one every ten seconds, for as long as BinaryLane took — so a long
+  backup wrote hundreds of identical records and buried the external command lines that are
+  the reason this tool logs at `debug` at all.
+- **`clean` logs the files it held back at `debug`, and their count at `info`.** A loop reports
+  its summary rather than its items, and the count is what is worth reading nightly.
+  `clean -v` now prints the count and `-vvv` the files.
+
 ### Fixed
 
+- **The record for a lock that could not be taken has a constant message.** It used the
+  exception's own text, which names the path and so varies per occurrence, leaving the log
+  store unable to group or count those failures. The path and the reason are in the context.
 - **A backup `clean` held back names which side it was on.** The record said a file had been
   kept as one of the most recent for its server, but carried only the path, so the local disk
   and the rclone remote wrote identical records for the same relative path. The console line

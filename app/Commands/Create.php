@@ -183,17 +183,33 @@ class Create extends BaseCommand
         // action's own explanation, the invoice a blocked one is waiting on
         $reason = null;
 
+        // the last step BinaryLane reported, so a poll that says the same thing writes nothing
+        $step = false;
+
         try
         {
             $this->binarylane->actions()->await(
                 $action,
                 timeout: $timeout,
                 interval: self::POLL_INTERVAL,
-                onPoll: function (Action $current) use ($progress) {
+                onPoll: function (Action $current) use ($progress, &$step) {
                     $progress->setProgress($current->progress?->percentComplete ?? 0);
 
-                    // don't write this out to console, will break the progress bar - just log it
-                    Log::debug("Backup progress", ['current_step_detail' => $current->progress?->currentStepDetail]);
+                    $detail = $current->progress?->currentStepDetail;
+
+                    // Only when the step changes. This fires every POLL_INTERVAL seconds for
+                    // as long as BinaryLane takes, so a half-hour backup wrote ~180 identical
+                    // records per server - which buries the thing debug is kept on for here,
+                    // the external command lines. The transitions are what was worth reading.
+                    if ($detail === $step)
+                    {
+                        return;
+                    }
+
+                    $step = $detail;
+
+                    // not to the console: anything written there breaks the progress bar
+                    Log::debug("Backup progress", ['current_step_detail' => $detail]);
                 },
                 // through Sleep rather than the client's own sleep(), so a test can
                 // fake the wait instead of spending ten real seconds a poll
