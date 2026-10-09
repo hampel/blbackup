@@ -905,3 +905,61 @@ it('reports the retention settings it would use', function () {
         ->toContain('[ ok ] expiry floor')
         ->toContain('the most recent 3 days of each server are always kept');
 });
+
+/*
+| --strict turns a warning-only run into exit 2, for a monitor that should hear about one,
+| and changes nothing else. All four cases are asserted because the broken implementation
+| reads as a pass: console-report 2.1.0's checkExitCode() declares no parameter, PHP accepts
+| the extra argument without complaint, and a warning returns 0 with the flag in --help and
+| the call in the code. A test that only asserts --strict succeeds settles nothing.
+*/
+
+it('exits 0 on a warning-only run without --strict', function () {
+    fakeApi([fakeServer()]);
+
+    // the suite's default config logs nowhere, which warns
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)->and($output)->toContain('Checks passed, with warnings');
+});
+
+it('exits 2 on a warning-only run with --strict', function () {
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate(['--strict' => true]);
+
+    expect($exit)->toBe(2)->and($output)->toContain('Checks passed, with warnings');
+});
+
+it('still exits 1 for a failure with --strict, not 2', function () {
+    fakeApi([fakeServer()]);
+    config(['blbackup.keepleast_days' => 'abc']);
+
+    [$exit] = validate(['--strict' => true]);
+
+    // 1 means failed with the flag and without it - deliberately not the monitoring-plugin
+    // numbering, where 1 is the warning
+    expect($exit)->toBe(1);
+});
+
+it('exits 0 with --strict when nothing warned', function () {
+    fakeApi([fakeServer()]);
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    [$exit, $output] = validate(['--strict' => true]);
+
+    expect($exit)->toBe(0)->and($output)->toContain('All checks passed');
+});
+
+it('changes nothing but the exit code', function () {
+    fakeApi([fakeServer()]);
+    [, $plain] = validate();
+
+    fakeApi([fakeServer()]);
+    [, $strict] = validate(['--strict' => true]);
+
+    // free space is read from the real disk, so it moves between two runs
+    $scrub = fn (string $out) => preg_replace('/[\d.]+ [KMGT]B/', 'SIZE', $out);
+
+    expect($scrub($strict))->toBe($scrub($plain));
+});

@@ -6,6 +6,19 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`app:validate --strict` exits 2 when a check warned**, for a monitor that should hear about
+  one. Without the flag a warning still exits 0, so a deploy gate is unchanged: an install that
+  raised its Slack threshold deliberately can still rebuild. A failure exits 1 either way, and
+  the flag changes no row, message or log record.
+
+### Changed
+
+- **Requires `hampel/console-report` ^2.2**, up from ^2.1, for the exit code above.
+
 ## [2.8.2] - 2026-10-03
 
 ### Added

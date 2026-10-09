@@ -30,6 +30,7 @@ class AppValidate extends BaseCommand
                             {--offline : make no call that leaves this machine, and send nothing}
                             {--unattended : do not send the messages whose only proof is a person seeing them arrive}
                             {--no-api : skip the checks that call the BinaryLane API, and nothing else}
+                            {--strict : exit 2 when a check warned, for a monitor that should hear of one}
                             {--d|download= : download this URL to the download path, to exercise the transfer end to end}';
 
     /**
@@ -158,7 +159,12 @@ class AppValidate extends BaseCommand
         }
 
         // a warning is not a failure
-        return $this->checkExitCode();
+        // --strict turns a warning-only run into exit 2 and changes nothing else: no row,
+        // message or record differs. A deploy gate wants 0 there - an install that set its
+        // slack threshold high on purpose must still be able to rebuild - while a monitor
+        // wants to hear about it. 1 still means a failure either way, which is deliberately
+        // not the monitoring-plugin numbering where 1 is the warning.
+        return $this->checkExitCode((bool) $this->option('strict'));
     }
 
     /**

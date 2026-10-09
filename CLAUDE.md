@@ -455,6 +455,15 @@ that has set nothing writes. `config/logging.php` says so beside the setting, an
 `.env.example` documents the same value: changing one means changing both. Settled
 2026-10-03 — do not raise it again.
 
+**`--strict` makes a warning-only run exit 2, and is the whole of what it does.** One
+argument to `checkExitCode()`, which `hampel/console-report` ^2.2 takes — on 2.1.0 the method
+declared no parameter, PHP accepted the extra argument silently and a warning still returned 0,
+so the constraint is `^2.2` rather than the lock alone. A deploy gate passes no flag, because an
+install that set its Slack threshold high deliberately must still be able to rebuild; a monitor
+passes it. `1` remains a failure either way, which is deliberately not the monitoring-plugin
+numbering. `ValidateCommandTest` asserts all four exit cases and that the output is identical
+with the flag: a test that only asserts `--strict` succeeds would pass against the inert version.
+
 **`app:validate` posts to Slack**, if a webhook is configured. That is
 deliberate and is why the levels are not behind a flag by default: a destination
 with a threshold only proves it works when something at that level is really

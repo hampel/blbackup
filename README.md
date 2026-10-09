@@ -155,7 +155,7 @@ blbackup move     <file>|--all [--remote=REMOTE] [--dry-run]
 blbackup clean    [--days=N] [--remote] [--dry-run]
 
 blbackup app:config   [--only=SECTION]
-blbackup app:validate [--offline] [--unattended] [--no-api] [-d|--download=URL]
+blbackup app:validate [--offline] [--unattended] [--no-api] [--strict] [-d|--download=URL]
 ```
 
 ### cron
@@ -266,6 +266,19 @@ writes a log record at every level, sends a test run summary and calls the API. 
 | `--offline` | there is no network | everything that leaves the machine |
 | `--unattended` | nobody is watching the Slack channel | the two Slack posts |
 | `--no-api` | you do not want the API called | the API calls |
+| `--strict` | a monitor should hear about a warning | nothing — it only changes the exit code |
+
+Exit codes:
+
+| | all fine | warnings only | any failure |
+|---|---|---|---|
+| `app:validate` | 0 | 0 | 1 |
+| `app:validate --strict` | 0 | 2 | 1 |
+
+**`1` means failed, with `--strict` and without it** — deliberately not the monitoring-plugin
+numbering, where `1` is the warning. A deploy gate wants a warning to pass, since an install
+that set its Slack threshold high on purpose must still be able to rebuild; a monitor wants to
+hear about it, and passes `--strict`. The flag changes no row, message or log record.
 
 `--offline` implies `--unattended`. Skipped checks are reported as skips, and warnings and
 failures are still logged. Blanking a webhook on the command line does not stop a post, because
