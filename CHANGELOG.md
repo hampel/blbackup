@@ -19,6 +19,15 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 - **Requires `hampel/console-report` ^2.2**, up from ^2.1, for the exit code above.
 
+### Fixed
+
+- **`.env.example` no longer shows a literal for a path whose default is computed.**
+  `DOWNLOAD_PATH`, `LOCK_FILE` and `LOG_STORAGE_PATH` each default to a location under the
+  storage path, which a compiled binary resolves against the working directory — so the
+  relative values shown were not the default, and resolved a `storage/` segment away from it
+  if copied. The three lines are blank now, with the prose above each saying what the default
+  computes to, and the file's header explains that form.
+
 ## [2.8.2] - 2026-10-03
 
 ### Added

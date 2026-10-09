@@ -9,9 +9,16 @@
 | mount when it was not.
 |
 | This checks the half a test can check: that the file and config/ name the same
-| settings. Whether a documented value IS the default is left to the EXAMPLE
+| settings. Whether a documented value IS the default is mostly left to the EXAMPLE
 | marker the file explains at the top, because encoding that here would need a
 | hand-kept map of env key to config key - another thing to drift.
+|
+| One class needs no map, though, and is the one that cannot be true: a default
+| computed from storage_path() has no literal to show, since a compiled binary
+| resolves the storage path against the working directory. Those keys are found by
+| scanning config/ rather than listed here, and their documented value must be
+| blank. Three lines showed a relative literal until 2026-10-09, each off by a
+| `storage/` segment from what the default actually resolves to in a phar.
 */
 
 /**
@@ -88,4 +95,50 @@ it('documents no setting the configuration does not read', function () {
     expect($imaginary)->toBeEmpty(
         'Documented but never read: ' . implode(', ', $imaginary)
     );
+});
+
+/**
+ * Settings whose default is computed from the storage path, found by scanning
+ * config/ so that a new one cannot be added without this noticing. Both shapes
+ * the tree uses: env('KEY', storage_path(...)) and env('KEY') ?: storage_path(...).
+ */
+function computedDefaultKeys(): array
+{
+    $keys = [];
+
+    foreach (glob(base_path('config/*.php')) as $file)
+    {
+        preg_match_all(
+            "/env\('([A-Z_]+)'(?:\s*,\s*|\)\s*\?:\s*)storage_path\(/",
+            file_get_contents($file),
+            $matches
+        );
+
+        $keys = array_merge($keys, $matches[1]);
+    }
+
+    return array_values(array_unique($keys));
+}
+
+it('finds the settings whose default is computed', function () {
+    // a scan that silently matches nothing passes forever
+    expect(computedDefaultKeys())->toContain('DOWNLOAD_PATH', 'LOCK_FILE', 'LOG_STORAGE_PATH');
+});
+
+it('documents a computed default as blank rather than inventing a literal', function () {
+    $example = file_get_contents(base_path('.env.example'));
+
+    foreach (computedDefaultKeys() as $key)
+    {
+        preg_match_all('/^#?' . preg_quote($key, '/') . '=(.*)$/m', $example, $matches);
+
+        expect($matches[1])->not->toBeEmpty("{$key} is not documented at all");
+
+        foreach ($matches[1] as $value)
+        {
+            // a literal here reads exactly like a real default and is never true for
+            // long: the storage path follows the working directory in a phar
+            expect(trim($value))->toBe('', "{$key} shows a literal for a computed default");
+        }
+    }
 });
