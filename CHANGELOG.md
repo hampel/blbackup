@@ -6,7 +6,7 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.9.0] - 2026-10-09
 
 ### Added
 
@@ -18,6 +18,9 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - **Requires `hampel/console-report` ^2.2**, up from ^2.1, for the exit code above.
+- **Dependencies updated to everything the constraints allow**, which for a compiled binary is
+  what the next build ships: `hampel/slack-message` 2.4.0, `illuminate/*` 13.35.0,
+  `monolog/monolog` 3.12.1 and `symfony/*` 7.4.20 among them.
 
 ### Fixed
 
@@ -569,7 +572,8 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.8.2...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/2.9.0...HEAD
+[2.9.0]: https://github.com/hampel/blbackup/compare/2.8.2...2.9.0
 [2.8.2]: https://github.com/hampel/blbackup/compare/2.8.1...2.8.2
 [2.8.1]: https://github.com/hampel/blbackup/compare/2.8.0...2.8.1
 [2.8.0]: https://github.com/hampel/blbackup/compare/2.7.2...2.8.0
