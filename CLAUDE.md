@@ -730,7 +730,10 @@ extend the class. Keep new helpers on the contract.
 - The code uses Allman braces and its own spacing, which is **not** Laravel/PSR-12.
   Pint is in `require-dev` but there is no `pint.json`, so running it would
   reformat the entire codebase — don't run it across existing files.
-- `composer test` runs Pest, as do `php vendor/bin/pest` and `php blbackup test`.
+- `composer test` runs Pest 4 (PHPUnit 12), as do `php vendor/bin/pest` and
+  `php blbackup test`. Pest 4 needs PHP 8.3, which is the floor anyway; it removed the
+  watch and faker plugins, which this suite never used, and changed snapshot naming, which
+  it has no snapshots to regenerate.
   `composer build` compiles the PHAR without dev dependencies, which is what CI
   releases from.
 - `phpunit.xml.dist` names both `tests/Unit` and `tests/Feature` as testsuites,

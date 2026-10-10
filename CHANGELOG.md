@@ -6,6 +6,13 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Tests run on Pest 4** (PHPUnit 12), from Pest 3. A development dependency only — nothing in
+  the shipped binary changes, and the constraint is now `^4` rather than a pinned patch of 3.
+
 ## [2.9.1] - 2026-10-10
 
 ### Added
