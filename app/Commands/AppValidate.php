@@ -284,6 +284,75 @@ class AppValidate extends BaseCommand
     }
 
     /**
+     * Report a lock another run is holding.
+     *
+     * A held lock is a check that could not run rather than one that found something, so it
+     * is a skip: flock is released by the kernel when its holder dies, so a failed acquire
+     * always means a live run, and the nightly window is the ordinary reason for one. Here
+     * that window is a multi-gigabyte download per server, so warning would exit 2 under
+     * --strict for hours a night, at a monitor that sees only the exit code and so cannot
+     * tell that from a real fault.
+     *
+     * Past blbackup.lock_stale_hours it warns instead: a run holding the lock that long is
+     * stuck rather than busy, which is the case the row exists to surface and which was
+     * indistinguishable from the ordinary one while both warned. An age that cannot be read
+     * warns too - it is neither busy nor stuck, and skipping it would hide a lock file
+     * something has gone wrong with.
+     *
+     * The age comes from the file's mtime; BackupLock::heldFor() says why the text inside it
+     * cannot be trusted for arithmetic. The text is still shown, because it names the pid
+     * and the command.
+     */
+    protected function reportHeldLock(BackupLock $lock) : void
+    {
+        $holder = $lock->holder();
+        $held = $lock->heldFor();
+        $hours = (int) config('blbackup.lock_stale_hours');
+
+        if ($held === null)
+        {
+            $this->reportWarn('lock file', "held by another run, and its age cannot be read [{$holder}]");
+
+            return;
+        }
+
+        if ($held >= $hours * 60)
+        {
+            $this->reportWarn('lock file', sprintf(
+                'held for %s, longer than the %d hours allowed - the run looks stuck [%s]',
+                $this->describeMinutes($held),
+                $hours,
+                $holder
+            ));
+
+            return;
+        }
+
+        $this->reportSkip('lock file', sprintf(
+            'held by another run for %s, so the lock could not be tested [%s]',
+            $this->describeMinutes($held),
+            $holder
+        ));
+    }
+
+    /**
+     * A duration a person reads, from minutes.
+     */
+    protected function describeMinutes(int $minutes) : string
+    {
+        if ($minutes < 60)
+        {
+            return $minutes . ($minutes === 1 ? ' minute' : ' minutes');
+        }
+
+        $hours = intdiv($minutes, 60);
+        $rest = $minutes % 60;
+
+        return $hours . ($hours === 1 ? ' hour' : ' hours')
+            . ($rest > 0 ? ' ' . $rest . ($rest === 1 ? ' minute' : ' minutes') : '');
+    }
+
+    /**
      * The two settings that decide what `clean` deletes.
      *
      * Both are read with intval(), so a value that is not a whole number means 0 - and 0
@@ -724,7 +793,7 @@ class AppValidate extends BaseCommand
         {
             if (!$lock->acquire($this->getName()))
             {
-                $this->reportWarn("lock file", "held by another run [" . $lock->holder() . "]");
+                $this->reportHeldLock($lock);
 
                 return;
             }

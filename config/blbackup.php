@@ -66,6 +66,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Lock stale hours
+    |--------------------------------------------------------------------------
+    |
+    | How long a run may hold the backup lock before app:validate calls it stuck.
+    |
+    | A lock held by another run is normal, and app:validate reports it as a skip rather
+    | than a warning: flock is released by the kernel when its holder dies, so a lock that
+    | will not open is held by something alive, and the nightly window is the ordinary
+    | reason. A monitor passing --strict should not hear about that every night - here the
+    | window is a multi-gigabyte download per server, so it is hours rather than minutes.
+    |
+    | Past this many hours it warns instead, because a run holding it that long is stuck
+    | rather than busy - a transfer that will never finish - and the two were
+    | indistinguishable while both warned. Set it above the longest legitimate run on this
+    | machine, which means the night that backs up everything rather than an average one.
+    */
+
+    'lock_stale_hours' => env('LOCK_STALE_HOURS', 12),
+
+    /*
+    |--------------------------------------------------------------------------
     | Keepleast days
     |--------------------------------------------------------------------------
     |

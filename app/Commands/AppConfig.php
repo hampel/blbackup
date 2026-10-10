@@ -70,6 +70,7 @@ class AppConfig extends Command
                 'Include File' => $this->optionalPath(config('blbackup.include_file')),
                 'Exclude File' => $this->optionalPath(config('blbackup.exclude_file')),
                 'Lock File' => $this->path(app(BackupLock::class)->path()),
+                'Lock Stale Hours' => (string) config('blbackup.lock_stale_hours'),
                 'zstd Binary' => $this->path(config('blbackup.zstd_binary')),
                 'wget Binary' => $this->path(config('blbackup.wget_binary')),
                 'rclone Binary' => $this->path(config('blbackup.rclone.binary')),

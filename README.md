@@ -128,6 +128,7 @@ shows what an install resolved to. Credentials are never printed.
 | `KEEPLEAST_DAYS` | `3` | Days of each server's backups `clean` always keeps. `0` turns it off |
 | `INCLUDE_FILE` / `EXCLUDE_FILE` | — | Server lists for `--all`. See [Server lists](#server-lists) |
 | `LOCK_FILE` | storage path | **Must be on a shared mount in a container.** See [The lock](#the-lock) |
+| `LOCK_STALE_HOURS` | `12` | When `app:validate` calls a held lock stuck rather than busy |
 | `WGET_BINARY` / `ZSTD_BINARY` / `RCLONE_BINARY` | `/usr/bin/…` | |
 | `RCLONE_REMOTE` | — | `remote:path`. Unset keeps images on this machine |
 | `LOG_CHANNEL` / `LOG_STACK` | `stack` / `null` | **Nothing is logged until `LOG_STACK` names a channel** |
@@ -222,6 +223,11 @@ Without `RCLONE_REMOTE`, backups stay in `DOWNLOAD_PATH` and rclone is never run
 
 Every command that writes takes one lock. If a run is still going when the next one starts, the
 next one is skipped and reports what holds the lock. A killed run releases it.
+
+**`app:validate` reports a held lock as a skip, not a warning.** A backup holds it for as long as
+the downloads take, so warning would mean `--strict` exiting 2 for hours every night. Past
+`LOCK_STALE_HOURS` it warns instead, because a run holding it that long is stuck rather than busy.
+Set that above the longest night this machine really has.
 
 **In a container, `LOCK_FILE` must be on a shared mount.** Each `docker compose run` has its own
 filesystem, so a lock inside the container does nothing. `app:validate` prints the path.

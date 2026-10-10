@@ -963,3 +963,106 @@ it('changes nothing but the exit code', function () {
 
     expect($scrub($strict))->toBe($scrub($plain));
 });
+
+/*
+| A lock held by another run is a check that could not run, not a fault: flock is released
+| by the kernel when its holder dies, so a failed acquire always means a live run - and
+| here that means a multi-gigabyte download per server, so a monitor polling --strict would
+| have exited 2 for hours a night. Past blbackup.lock_stale_hours it warns, because that run
+| is stuck rather than busy.
+*/
+
+it('reports a lock held by a running backup as a skip, not a warning', function () {
+    $handle = holdLock();
+    fakeApi([fakeServer()]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[    ] lock file')
+        ->toContain('held by another run for 0 minutes, so the lock could not be tested')
+        ->toContain('pid 999, cron');
+
+    fclose($handle);
+});
+
+it('does not exit 2 under --strict while a backup is running', function () {
+    $handle = holdLock();
+    fakeApi([fakeServer()]);
+    // the only other warning the default test config produces
+    config(['logging.default' => 'single', 'logging.channels.single.path' => storage_path('probe.log')]);
+
+    [$exit] = validate(['--strict' => true]);
+
+    // the nightly window must not look like a fault to a monitor
+    expect($exit)->toBe(0);
+
+    fclose($handle);
+});
+
+it('warns about a lock held longer than the stale threshold', function () {
+    $handle = holdLock();
+    fakeApi([fakeServer()]);
+
+    config(['blbackup.lock_stale_hours' => 4]);
+    touch(config('blbackup.lock_file'), now()->subHours(5)->subMinutes(2)->timestamp);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] lock file')
+        ->toContain('held for 5 hours 2 minutes, longer than the 4 hours allowed - the run looks stuck');
+
+    fclose($handle);
+});
+
+it('exits 2 under --strict for a lock that looks stuck', function () {
+    $handle = holdLock();
+    fakeApi([fakeServer()]);
+
+    config([
+        'blbackup.lock_stale_hours' => 4,
+        'logging.default' => 'single',
+        'logging.channels.single.path' => storage_path('probe.log'),
+    ]);
+    touch(config('blbackup.lock_file'), now()->subHours(9)->timestamp);
+
+    [$exit, $output] = validate(['--strict' => true]);
+
+    expect($exit)->toBe(2)->and($output)->toContain('the run looks stuck');
+
+    fclose($handle);
+});
+
+it('warns when the age of a held lock cannot be read', function () {
+    fakeApi([fakeServer()]);
+
+    // Stubbed rather than staged: acquire() recreates the lock file, so the only real
+    // route to an unreadable mtime is a stat that fails while the lock is held by
+    // someone else - a race, not a state a test can arrange. The branch exists because
+    // an age that cannot be read is neither busy nor stuck, and skipping it would hide a
+    // lock file something has gone wrong with.
+    app()->instance(App\Support\BackupLock::class, new class extends App\Support\BackupLock
+    {
+        public function acquire(string $command) : bool
+        {
+            return false;
+        }
+
+        public function heldFor() : ?int
+        {
+            return null;
+        }
+
+        public function holder() : string
+        {
+            return 'pid 999, cron';
+        }
+    });
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] lock file')
+        ->toContain('its age cannot be read');
+});

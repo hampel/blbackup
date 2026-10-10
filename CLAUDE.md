@@ -200,6 +200,15 @@ leave it alone, both to take and to release. A dry run skips the lock entirely �
 asking what `clean --dry-run` would delete while a backup runs is the point of
 the flag.
 
+**A lock held by another run is a skip in `app:validate`, not a warning.** `flock` is released
+by the kernel when its holder dies, so a failed acquire always means a live run — and here that
+run is downloading multi-gigabyte images, so a warning meant `--strict` exiting 2 for hours a
+night at a monitor that sees only the exit code. Past `blbackup.lock_stale_hours` (12) it warns,
+because that one is stuck rather than busy, and the two were indistinguishable while both warned.
+`BackupLock::heldFor()` takes the age from the file's **mtime**: the `started …` text inside the
+file is local time with no offset, so two runs disagreeing about the timezone would shift the age
+by that offset. Adopted from the same fix in a sibling tool, 2026-10-10.
+
 **In a container `LOCK_FILE` must name a path on a shared mount.** Each
 `docker compose run` gets its own filesystem, so the default under the storage
 path is a lock two concurrent runs cannot see each other holding — it does

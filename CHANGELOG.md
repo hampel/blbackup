@@ -6,6 +6,22 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`LOCK_STALE_HOURS`, default 12.** How long a run may hold the backup lock before
+  `app:validate` calls it stuck rather than busy.
+
+### Fixed
+
+- **A lock held by a running backup reports as a skip rather than a warning.** `flock` is
+  released by the kernel when its holder dies, so a lock that will not open is held by a live
+  run — and a backup holds it for as long as its downloads take, so `app:validate --strict`
+  exited 2 for hours every night at a monitor that cannot tell which warning it was. Past
+  `LOCK_STALE_HOURS` it still warns, because that run is stuck rather than busy, and an age that
+  cannot be read warns too.
+
 ## [2.9.0] - 2026-10-09
 
 ### Added

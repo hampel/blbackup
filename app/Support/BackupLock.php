@@ -97,6 +97,37 @@ class BackupLock
         return trim((string) @file_get_contents($this->path()));
     }
 
+    /**
+     * How long the lock has been held, in whole minutes.
+     *
+     * From the file's mtime, which acquire() rewrites, and deliberately not from the
+     * `started` text inside it: that is a local-time string with no offset, so two runs
+     * disagreeing about blbackup.timezone would shift the age by exactly that offset -
+     * measured elsewhere in this fleet as a 30-minute-old lock reading as ten and a half
+     * hours, which is enough to call a healthy run stuck. The text still names the pid
+     * and the command, which is what it is for.
+     *
+     * clearstatcache() because a stat taken earlier in the same process answers from
+     * cache, and app:validate has already touched this path.
+     *
+     * @return int|null minutes, or null when the mtime cannot be read
+     */
+    public function heldFor() : ?int
+    {
+        $path = $this->path();
+
+        clearstatcache(true, $path);
+
+        $mtime = @filemtime($path);
+
+        if ($mtime === false)
+        {
+            return null;
+        }
+
+        return (int) max(0, intdiv(time() - $mtime, 60));
+    }
+
     public function path() : string
     {
         return config('blbackup.lock_file');
