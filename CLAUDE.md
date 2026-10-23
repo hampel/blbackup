@@ -55,8 +55,9 @@ call each other through `$this->call()` rather than sharing code:
 - `clean --remote` expires the rclone side as well as the local disk.
 
 **`cron` is the entry point for an unattended run**, and the only command that
-posts a run summary. It runs `create --all --download` and then `clean`, and
-decides two things from configuration rather than from flags:
+posts a run summary. It runs `download --all` and then `clean` — **it takes no
+backups**, for the reason below — and decides two things from configuration
+rather than from flags:
 
 - **`--move` is gated on `RCLONE_REMOTE` being set.** An installation that can
   run on the machine holding the backups has nowhere to move them to, and
@@ -67,10 +68,40 @@ decides two things from configuration rather than from flags:
 
 It never prompts — `clean` is called with `--no-interaction`, because a
 `confirm()` with no stdin to read is an exception rather than a default. There is
-deliberately no `--dry-run`: `check`, `move` and `clean` have one but `create`
-and `download` do not, so it would really take a snapshot and really pull it
-down. A stage that fails does not stop the ones after it, and any failure makes
+deliberately no `--dry-run`: `check`, `move` and `clean` have one but `download`
+does not, so it would really pull a multi-gigabyte image down. A stage that fails does not stop the ones after it, and any failure makes
 the whole run exit non-zero.
+
+**`cron` downloads BinaryLane's scheduled backups rather than taking its own.**
+Until 2026-10-23 it ran `create --all --download`, a temporary backup per server
+per night. BinaryLane's specification 0.45.0 then stated **at most two temporary
+backups per server in any seven days**, which a nightly run exceeds from its third
+night. The limit names temporary backups only, scheduled ones download like any
+other (measured: a link came back for every daily on the account), and
+`download` already took the newest backup of any type — so the change is mostly
+which servers it visits and what it checks:
+
+- **`download --all` skips a server with no scheduled slot** (`scheduledOnly()`),
+  one `info` line naming them. Skipped, not failed: an account with servers
+  deliberately not backed up would otherwise report the same failures nightly.
+  A server named on the command line is never filtered, so a backup taken by
+  hand with `create` still downloads.
+- **It picks the newest backup whose status is `available`.** A scheduled backup
+  can be in progress when `cron` runs; `create` used to wait for its own, so
+  nothing needed this before.
+- **`isCurrent()` fails a backup older than its schedule plus
+  `blbackup.backup_grace_hours`** (12). This is the one failure the change
+  introduces and nothing else would see: a stopped schedule finds the same image
+  every night, `download` skips it as already there, and the run reads as healthy.
+  The interval is the shortest slot the server has — `scheduledBackupHours()` on
+  `BaseCommand`, 24/168/744 — and the grace covers BinaryLane's approximate hour,
+  measured finishing more than three hours after the hour set. The stale backup is
+  still downloaded first: it is the newest there is.
+- **`app:validate` reports how many servers have scheduled backups**, and warns
+  when none do, because then `cron` backs up nothing and says it succeeded.
+
+`create` is unchanged and still takes a temporary backup — the right tool by
+hand, within the limit. **Do not put it back into `cron`.**
 
 ## Architecture
 
@@ -606,7 +637,11 @@ the request, and the state of the `downloads` disk afterwards.
 client's account and token in a `beforeEach` chained onto `uses()`, so assertions
 don't depend on the developer's `.env` — it also forces `logging.default` to `null`, since the
 project `.env` is loaded during tests and the suite would otherwise append to
-whatever log the developer has configured. It pins `blbackup.keepleast_days` to 0 as
+whatever log the developer has configured. It pins `blbackup.backup_grace_hours`
+to a million, because the fixtures' backups are dated August 2026 and every one
+would be stale against the real clock — the freshness tests set it and date their
+images relative to `now()`. `fakeServer()` has one daily slot by default and
+`fakeImage()` is `available`, since `download --all` needs both. It pins `blbackup.keepleast_days` to 0 as
 well: nearly every `clean` fixture is one server's backups, which the floor would hold
 back, so the tests that are about the floor set it themselves. `Storage::fake('downloads')` repoints
 the download disk into `storage/framework/testing`. Helpers: `fakeServer()` /

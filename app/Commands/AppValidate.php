@@ -284,6 +284,39 @@ class AppValidate extends BaseCommand
     }
 
     /**
+     * How many servers BinaryLane backs up on a schedule, which is what cron downloads.
+     *
+     * cron takes no backups of its own - BinaryLane allows at most two temporary backups per
+     * server in any seven days - so a server with no scheduled slot is not backed up by it at
+     * all. That is a fact about the account rather than this machine, and nothing else here
+     * would surface it: the run would complete, skip those servers, and report success. None
+     * scheduled at all warns, because then cron backs up nothing. The include and exclude
+     * lists are left out, since they narrow what cron touches and have rows of their own.
+     */
+    protected function checkScheduledBackups() : void
+    {
+        $servers = $this->allServers();
+
+        $scheduled = array_filter($servers, fn ($server) => $this->scheduledBackupHours($server) !== null);
+
+        if ($scheduled === [])
+        {
+            $this->reportWarn('scheduled backups', sprintf(
+                'none of %d servers has scheduled backups, so cron has nothing to download',
+                count($servers)
+            ));
+
+            return;
+        }
+
+        $this->reportOk('scheduled backups', sprintf(
+            '%d of %d servers - cron downloads these and skips the rest',
+            count($scheduled),
+            count($servers)
+        ));
+    }
+
+    /**
      * Report a lock another run is holding.
      *
      * A held lock is a check that could not run rather than one that found something, so it
@@ -911,6 +944,8 @@ class AppValidate extends BaseCommand
             // every page. This line used to count one page of a listing, so it could
             // never say more than twenty whatever the account held
             $this->reportOk("Servers visible", (string) $this->binarylane->servers()->count());
+
+            $this->checkScheduledBackups();
         }
         catch (BinaryLaneFailure $e)
         {

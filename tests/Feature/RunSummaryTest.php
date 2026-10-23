@@ -233,7 +233,8 @@ it('posts one summary for a run, not one per stage', function () {
     $fields = collect(sentPayload($history)['attachments'][0]['fields'])->pluck('value', 'title');
 
     expect(sentPayload($history)['text'])->toBe('Backup completed on nas.example.test')
-        ->and($fields['Backups taken'])->toBe('1')
+        // cron takes no backups now, so that field is absent rather than zero
+        ->and($fields->has('Backups taken'))->toBeFalse()
         ->and($fields['Downloaded'])->toBe('1 (1.0 MB)')
         ->and($fields['Moved to remote'])->toBe('1');
 });
@@ -256,12 +257,13 @@ it('reports the failure a run recorded', function () {
     $history = [];
     interceptSummary($history);
 
-    fakeApi([fakeServer()], statuses: [fakeAction('errored', 40)]);
+    // a scheduled server with no backup at all
+    fakeApi([fakeServer()]);
 
     $this->artisan('cron', ['--no-clean' => true])->assertFailed();
 
     expect(sentPayload($history)['text'])->toBe('Backup failed on nas.example.test')
-        ->and(sentPayload($history)['attachments'][0]['text'])->toContain('web1.example.com (create): backup errored');
+        ->and(sentPayload($history)['attachments'][0]['text'])->toContain('web1.example.com (download): no backup data returned');
 });
 
 it('does not fail the run when slack refuses the summary', function () {

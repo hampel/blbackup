@@ -56,6 +56,11 @@ uses(Tests\TestCase::class)
             'blbackup.rclone.remote' => 'remote:backups',
             'blbackup.lock_file' => storage_path('framework/testing/blbackup.lock'),
 
+            // the fixtures' backups are dated in August 2026, so against the real clock
+            // every one would be stale - the freshness check is off unless a test is
+            // about it, and those use backups dated relative to now
+            'blbackup.backup_grace_hours' => 1_000_000,
+
             // expire strictly by age unless a test is about the floor - most clean
             // fixtures are one server's backups, which the floor would hold back
             'blbackup.keepleast_days' => 0,
@@ -130,6 +135,9 @@ function fakeServer(array $attributes = []): array
         'disk' => 40,
         'memory' => 2048,
         'vcpus' => 2,
+        // one daily slot, as a server BinaryLane backs up on a schedule has - which is
+        // what download --all and so cron need, since neither takes backups any more
+        'selected_size_options' => ['daily_backups' => 1, 'weekly_backups' => 0, 'monthly_backups' => 0],
     ], $attributes);
 }
 
@@ -142,7 +150,8 @@ function fakeImage(array $attributes = []): array
         'public' => false,
         'created_at' => '2026-08-20T14:30:00Z',
         'size_gigabytes' => MEGABYTE_IN_GB,
-        'backup_info' => ['server_id' => 100],
+        'status' => 'available',
+        'backup_info' => ['server_id' => 100, 'type' => 'daily'],
     ], $attributes);
 }
 

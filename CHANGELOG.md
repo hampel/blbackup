@@ -10,6 +10,23 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`cron` downloads the backups BinaryLane takes on each server's schedule, and takes none of its
+  own.** BinaryLane allows at most two temporary backups per server in any seven days, and `cron`
+  took one per server every night with `create`, so from the third night of every week its
+  backups were refused. It now runs `download --all` and `clean`. **A server needs scheduled
+  backups enabled in BinaryLane to be backed up** — daily, weekly or monthly — and a server with
+  none is skipped. `create` is unchanged, for use by hand.
+- **`download --all` downloads only servers with scheduled backups**, and **any download picks the
+  newest completed backup**, passing over one still being taken. A server named on the command
+  line is downloaded whatever its schedule.
+
+### Added
+
+- **`BACKUP_GRACE_HOURS`, default 12.** A scheduled backup older than its schedule plus this fails
+  `download`, so a schedule that stops is reported rather than skipped every night as already
+  downloaded. The stale backup is still downloaded.
+- **`app:validate` reports how many servers have scheduled backups**, and warns when none do.
+
 - **Tests run on Pest 4** (PHPUnit 12), from Pest 3. A development dependency only — nothing in
   the shipped binary changes, and the constraint is now `^4` rather than a pinned patch of 3.
 

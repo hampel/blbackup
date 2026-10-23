@@ -378,3 +378,119 @@ it('does not read the lists for a named server, so a missing one cannot block th
 
     Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
 });
+
+/*
+| download --all fetches the backups BinaryLane takes on each server's schedule,
+| because nothing takes them nightly any more - BinaryLane allows at most two
+| temporary backups per server in any seven days. So it must pick a backup that
+| has finished, skip a server with no schedule, and notice a schedule that stops,
+| which would otherwise look like a good night: the same backup skipped as
+| already downloaded, forever.
+*/
+
+function unscheduled(array $attributes = []): array
+{
+    return fakeServer(array_merge(
+        ['selected_size_options' => ['daily_backups' => 0, 'weekly_backups' => 0, 'monthly_backups' => 0]],
+        $attributes
+    ));
+}
+
+function hoursAgo(int $hours): string
+{
+    return now()->subHours($hours)->utc()->format('Y-m-d\TH:i:s\Z');
+}
+
+it('downloads the newest completed backup, not one still being taken', function () {
+    $finished = fakeImage(['id' => 111, 'created_at' => '2026-08-19T14:30:00Z']);
+    $inProgress = fakeImage(['id' => 222, 'created_at' => '2026-08-20T14:30:00Z', 'status' => 'pending']);
+
+    fakeApi([$this->server], [$finished, $inProgress], fakeLink(111, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['--all' => true])->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath(backupPath(date: '20260820-003000', image: 111))));
+});
+
+it('fails a server whose every backup is still being taken', function () {
+    fakeApi([$this->server], [fakeImage(['status' => 'pending'])], fakeLink(12345, $this->url));
+    fakeBinaries();
+
+    $this->artisan('download', ['--all' => true])
+        ->expectsOutputToContain('No completed backup for web1.example.com yet')
+        ->assertFailed();
+
+    Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'wget'));
+});
+
+it('skips a server with no scheduled backups under --all', function () {
+    $other = unscheduled(['id' => 200, 'name' => 'db1.example.com']);
+
+    fakeApi([$this->server, $other], [$this->image], fakeLink(12345, $this->url));
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['--all' => true, '-v' => true])
+        ->expectsOutputToContain('1 server(s) have no scheduled backups and are skipped: db1.example.com')
+        ->assertSuccessful();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'web1.example.com'));
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'db1.example.com'));
+});
+
+it('still downloads a server with no schedule when it is named', function () {
+    // a backup taken by hand is still worth fetching
+    fakeOneBackup(unscheduled(), $this->image, $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])->assertSuccessful();
+
+    Process::assertRan(wgetCommand($this->url, downloadPath($this->path)));
+});
+
+it('fails a daily backup older than its schedule allows, having still downloaded it', function () {
+    config(['blbackup.backup_grace_hours' => 12]);
+
+    fakeOneBackup($this->server, fakeImage(['created_at' => hoursAgo(40)]), $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['--all' => true])
+        ->expectsOutputToContain('The newest backup of web1.example.com is 40 hours old, against a schedule that should have taken one within 36')
+        ->assertFailed();
+
+    // the stale backup is still the newest there is, and worth having
+    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'wget'));
+});
+
+it('accepts a daily backup inside its schedule and the grace', function () {
+    config(['blbackup.backup_grace_hours' => 12]);
+
+    fakeOneBackup($this->server, fakeImage(['created_at' => hoursAgo(30)]), $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['--all' => true])->assertSuccessful();
+});
+
+it('gives a weekly schedule a week', function () {
+    config(['blbackup.backup_grace_hours' => 12]);
+
+    $weekly = fakeServer(['selected_size_options' => ['daily_backups' => 0, 'weekly_backups' => 1, 'monthly_backups' => 0]]);
+
+    fakeOneBackup($weekly, fakeImage(['created_at' => hoursAgo(100)]), $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+    $this->artisan('download', ['--all' => true])->assertSuccessful();
+
+    fakeOneBackup($weekly, fakeImage(['id' => 777, 'created_at' => hoursAgo(190)]), $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+    $this->artisan('download', ['--all' => true])->assertFailed();
+});
+
+it('does not judge the age of a backup on a server with no schedule', function () {
+    config(['blbackup.backup_grace_hours' => 12]);
+
+    // taken by hand, so how old it is was the operator's choice
+    fakeOneBackup(unscheduled(), fakeImage(['created_at' => hoursAgo(400)]), $this->url);
+    fakeBinaries(['*wget*' => wgetWrites(MEGABYTE)]);
+
+    $this->artisan('download', ['server' => 'web1.example.com'])->assertSuccessful();
+});

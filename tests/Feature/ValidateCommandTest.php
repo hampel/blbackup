@@ -1066,3 +1066,32 @@ it('warns when the age of a held lock cannot be read', function () {
         ->and($output)->toContain('[warn] lock file')
         ->toContain('its age cannot be read');
 });
+
+/*
+| cron downloads the backups BinaryLane takes on a schedule and takes none of its own, so
+| a server with no scheduled slot is not backed up by it at all. The count says so.
+*/
+
+it('reports how many servers have scheduled backups', function () {
+    fakeApi([fakeServer(), fakeServer([
+        'id' => 200,
+        'name' => 'db1.example.com',
+        'selected_size_options' => ['daily_backups' => 0, 'weekly_backups' => 0, 'monthly_backups' => 0],
+    ])]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[ ok ] scheduled backups')
+        ->toContain('1 of 2 servers - cron downloads these and skips the rest');
+});
+
+it('warns when no server has scheduled backups', function () {
+    fakeApi([fakeServer(['selected_size_options' => ['daily_backups' => 0, 'weekly_backups' => 0, 'monthly_backups' => 0]])]);
+
+    [$exit, $output] = validate();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[warn] scheduled backups')
+        ->toContain('none of 1 servers has scheduled backups, so cron has nothing to download');
+});

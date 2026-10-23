@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\Storage;
 | Whether they leave is gated on RCLONE_REMOTE alone. An installation that can
 | run the container on the file server holding the backups has nowhere to move
 | them to, and unsetting one variable is the whole of that change.
+|
+| It downloads the backups BinaryLane takes on each server's schedule and takes
+| none of its own: BinaryLane allows at most two temporary backups per server in
+| any seven days, and a nightly run needs seven.
 */
 
 beforeEach(function () {
@@ -30,20 +35,50 @@ function ranRclone(string $subcommand): Closure
     return fn ($process) => str_contains($process->command, ' ' . $subcommand . ' ');
 }
 
-it('backs up, downloads, moves and expires when a remote is configured', function () {
+/**
+ * Any take_backup action at all, whatever its slot or strategy.
+ */
+function anyBackupTaken(): Closure
+{
+    return fn ($request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/actions')
+        && ($request['type'] ?? null) === 'take_backup';
+}
+
+it('downloads, moves and expires when a remote is configured', function () {
     $this->artisan('cron')
-        ->expectsOutputToContain('downloading and moving to [remote:backups]')
+        ->expectsOutputToContain('Downloading the scheduled backups of all servers and moving them to [remote:backups]')
         ->assertSuccessful();
 
     Process::assertRan(ranRclone('moveto'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'lsjson -R'));
 });
 
+it('takes no backups of its own', function () {
+    $this->artisan('cron', ['--no-clean' => true])->assertSuccessful();
+
+    // the scheduled backup is downloaded; nothing is asked of BinaryLane that would
+    // count against its two temporary backups per server in seven days
+    Http::assertNotSent(anyBackupTaken());
+    Process::assertRan(fn ($process) => str_contains($process->command, 'wget'));
+});
+
+it('skips a server with no scheduled backups, and still succeeds', function () {
+    fakeApi([fakeServer(['selected_size_options' => ['daily_backups' => 0, 'weekly_backups' => 0, 'monthly_backups' => 0]])]);
+
+    $this->artisan('cron', ['--no-clean' => true, '-v' => true])
+        ->expectsOutputToContain('1 server(s) have no scheduled backups and are skipped: web1.example.com')
+        ->assertSuccessful();
+
+    Http::assertNotSent(anyBackupTaken());
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'wget'));
+});
+
 it('downloads and keeps the file when no remote is configured', function () {
     config(['blbackup.rclone.remote' => null]);
 
     $this->artisan('cron')
-        ->expectsOutputToContain('downloading only - no rclone remote is configured')
+        ->expectsOutputToContain('without moving them - no rclone remote is configured')
         ->assertSuccessful();
 
     // the whole of the change when the tool runs on the box that keeps the
@@ -55,7 +90,7 @@ it('downloads and keeps the file when no remote is configured', function () {
 
 it('leaves the files here but still expires the remote with --no-move', function () {
     $this->artisan('cron', ['--no-move' => true])
-        ->expectsOutputToContain('downloading only - moving is switched off for this run')
+        ->expectsOutputToContain('without moving them - moving is switched off for this run')
         ->assertSuccessful();
 
     Process::assertDidntRun(ranRclone('moveto'));
@@ -82,7 +117,7 @@ it('expires old backups without asking', function () {
     expect(Storage::disk('downloads')->exists('web1.example.com/backup-web1-20240101-120000-99999.zst'))->toBeFalse();
 });
 
-it('passes a server list through to the create stage', function () {
+it('passes a server list through to the download stage', function () {
     $list = writeServerList('exclude.txt', ['web1.example.com']);
 
     $this->artisan('cron', ['--exclude' => $list, '--no-clean' => true])->assertSuccessful();
@@ -90,13 +125,14 @@ it('passes a server list through to the create stage', function () {
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'wget'));
 });
 
-it('still expires when the backups failed, and reports failure', function () {
-    fakeApi([fakeServer()], statuses: [fakeAction('errored', 40)]);
+it('still expires when the downloads failed, and reports failure', function () {
+    // a scheduled server with no backup at all: its schedule has never run
+    fakeApi([fakeServer()]);
 
-    // a server that would not back up tonight is no reason to leave last
+    // a server that could not be downloaded tonight is no reason to leave last
     // month's downloads filling the disk
     $this->artisan('cron')
-        ->expectsOutputToContain('Backup stage [create] failed')
+        ->expectsOutputToContain('Backup stage [download] failed')
         ->assertFailed();
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'lsjson -R'));

@@ -325,6 +325,29 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * How often BinaryLane takes this server's scheduled backups, in hours, or null when it
+     * takes none.
+     *
+     * The shortest rotation the server has a slot in decides it: one daily slot means a new
+     * backup every day, whatever weekly or monthly slots sit beside it. A server with no slot
+     * of any scheduled kind has nothing for `cron` to download, because `cron` no longer takes
+     * backups - BinaryLane allows at most two temporary backups per server in seven days, and
+     * a nightly run needs seven.
+     */
+    protected function scheduledBackupHours(Server $server) : ?int
+    {
+        $options = $server->selectedSizeOptions;
+
+        return match (true)
+        {
+            ($options?->dailyBackups ?? 0) > 0 => 24,
+            ($options?->weeklyBackups ?? 0) > 0 => 24 * 7,
+            ($options?->monthlyBackups ?? 0) > 0 => 24 * 31,
+            default => null,
+        };
+    }
+
+    /**
      * Every server on the account, across every page.
      *
      * Walked with each() rather than read from one list() call, and that is the

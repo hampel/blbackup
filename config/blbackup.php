@@ -66,6 +66,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Backup grace hours
+    |--------------------------------------------------------------------------
+    |
+    | How much older than its schedule a server's newest backup may be before `download`
+    | reports it as a failure.
+    |
+    | `cron` downloads the backups BinaryLane takes on each server's schedule rather than
+    | taking its own, so a schedule that stops is the failure worth catching - and it is the
+    | quiet kind: `download` would find the same backup night after night, skip it as already
+    | downloaded, and every run would look healthy. A daily backup older than a day plus this
+    | is therefore a failure, as is a weekly one older than a week plus this.
+    |
+    | BinaryLane's backup hour is approximate - backups have been measured finishing more
+    | than three hours after the hour they are set for, and a run can fall either side of
+    | one - so the grace has to cover that jitter while staying short of a missed night.
+    */
+
+    'backup_grace_hours' => env('BACKUP_GRACE_HOURS', 12),
+
+    /*
+    |--------------------------------------------------------------------------
     | Lock stale hours
     |--------------------------------------------------------------------------
     |

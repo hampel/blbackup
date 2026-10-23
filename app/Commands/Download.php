@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
 use Hampel\BinaryLane\Api\Entity\Image;
 use Hampel\BinaryLane\Api\Entity\Server;
+use Hampel\BinaryLane\Api\Enum\ImageStatus;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
@@ -24,7 +25,7 @@ class Download extends BaseCommand
     protected $signature = 'download
                             {server? : download most recent backup for specified hostname or numeric server id}
                             {--image= : download specific backup image id}
-                            {--all : download most recent backups for all servers in account}
+                            {--all : download the most recent backup of every server BinaryLane backs up on a schedule}
                             {--include= : include only this list of servers}
                             {--exclude= : exclude this list of servers}
                             {--f|force : force re-download of existing backup}
@@ -87,7 +88,7 @@ class Download extends BaseCommand
                 $this->fail("No server data returned for {$hostnameOrServerId}");
             }
 
-            $servers = $this->applyServerLists($servers);
+            $servers = $this->scheduledOnly($this->applyServerLists($servers));
         }
         elseif (empty($hostnameOrServerId))
         {
@@ -136,7 +137,28 @@ class Download extends BaseCommand
                     return false;
                 }
 
-                $image = collect($backups)->sortBy(fn (Image $backup) => $backup->createdAt)->last();
+                // the newest COMPLETED one: a scheduled backup can still be in progress
+                // when this runs, and its image is listed before it can be downloaded.
+                // create used to wait for its own backup, so nothing needed this before
+                $image = collect($backups)
+                    ->filter(fn (Image $backup) => $backup->status === ImageStatus::Available)
+                    ->sortBy(fn (Image $backup) => $backup->createdAt)
+                    ->last();
+
+                if ($image === null)
+                {
+                    $this->log(
+                        'warning',
+                        "No completed backup for {$server->name} yet - every one listed is still being taken",
+                        "No completed backup",
+                        ['server' => $server->name, 'backups' => count($backups)]
+                    );
+
+                    $this->summary->recordFailure($server->name, 'download', 'no completed backup yet');
+
+                    return false;
+                }
+
                 $imageId = $image->id;
 
                 $url = $this->compressedUrl($this->binarylane->images()->download($imageId));
@@ -153,7 +175,11 @@ class Download extends BaseCommand
                     return false;
                 }
 
-                return $this->downloadImage($image, $server, $url);
+                // downloaded first, judged second: a stale backup is still the newest one
+                // there is, and worth having while the schedule is put right
+                $inPlace = $this->downloadImage($image, $server, $url);
+
+                return $this->isCurrent($image, $server) && $inPlace;
             });
 
         if ($failed->isNotEmpty())
@@ -169,6 +195,86 @@ class Download extends BaseCommand
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The servers BinaryLane backs up on a schedule, which is what --all downloads.
+     *
+     * A server with no scheduled slot has nothing to download unless somebody took a backup
+     * by hand - and nothing takes one nightly any more, because BinaryLane allows at most two
+     * temporary backups per server in any seven days. Skipped rather than failed: on an
+     * account where some servers are deliberately not backed up, failing them would report
+     * the same servers every night and teach the reader to ignore the run summary. A server
+     * named on the command line is never filtered, so a backup taken by hand still downloads.
+     *
+     * @param list<Server> $servers
+     * @return list<Server>
+     */
+    protected function scheduledOnly(array $servers) : array
+    {
+        $unscheduled = array_values(array_filter(
+            $servers,
+            fn (Server $server) => $this->scheduledBackupHours($server) === null
+        ));
+
+        if ($unscheduled !== [])
+        {
+            $names = array_map(fn (Server $server) => $server->name, $unscheduled);
+
+            $this->log(
+                'info',
+                count($unscheduled) . " server(s) have no scheduled backups and are skipped: " . implode(', ', $names),
+                "Servers with no scheduled backups skipped",
+                ['count' => count($unscheduled), 'servers' => $names]
+            );
+        }
+
+        return array_values(array_filter(
+            $servers,
+            fn (Server $server) => $this->scheduledBackupHours($server) !== null
+        ));
+    }
+
+    /**
+     * Whether a server's newest backup is as recent as its schedule says it should be.
+     *
+     * The one failure `cron` cannot otherwise see now that it downloads BinaryLane's
+     * scheduled backups instead of taking its own: a schedule that stops. Nothing errors -
+     * the same backup is found each night, skipped as already downloaded, and the run summary
+     * reads exactly like a good night. So a backup older than its schedule plus
+     * blbackup.backup_grace_hours fails the server.
+     *
+     * A server with no scheduled backups has no schedule to be late against: its backup was
+     * taken by hand, and how old that is was the operator's choice.
+     */
+    protected function isCurrent(Image $image, Server $server) : bool
+    {
+        $hours = $this->scheduledBackupHours($server);
+
+        if ($hours === null || $image->createdAt === null)
+        {
+            return true;
+        }
+
+        $limit = $hours + (int) config('blbackup.backup_grace_hours');
+        $age = (int) floor((CarbonImmutable::now()->getTimestamp() - $image->createdAt->getTimestamp()) / 3600);
+
+        if ($age <= $limit)
+        {
+            return true;
+        }
+
+        $this->log(
+            'error',
+            "The newest backup of {$server->name} is {$age} hours old, against a schedule that should"
+                . " have taken one within {$limit} - its backup schedule may have stopped",
+            "Newest backup is older than its schedule allows",
+            ['server' => $server->name, 'image_id' => $image->id, 'age_hours' => $age, 'limit_hours' => $limit]
+        );
+
+        $this->summary->recordFailure($server->name, 'download', "newest backup is {$age} hours old");
+
+        return false;
     }
 
     /**

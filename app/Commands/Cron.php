@@ -97,22 +97,27 @@ class Cron extends BaseCommand
      */
     protected function stages(?string $remote, bool $move) : array
     {
-        $create = ['--all' => true, '--download' => true];
+        // download BinaryLane's scheduled backups rather than taking our own. Taking one
+        // per server per night was what this did until BinaryLane began allowing at most
+        // two temporary backups per server in any seven days; a scheduled backup is not
+        // subject to that, is downloadable like any other, and costs the run no time
+        // waiting for it to be taken. download --all skips a server with no schedule.
+        $download = ['--all' => true];
 
         if ($move)
         {
-            $create['--move'] = true;
+            $download['--move'] = true;
         }
 
         foreach (['include', 'exclude'] as $option)
         {
             if ($this->option($option))
             {
-                $create["--{$option}"] = $this->option($option);
+                $download["--{$option}"] = $this->option($option);
             }
         }
 
-        $stages = ['create' => $create];
+        $stages = ['download' => $download];
 
         if (!$this->option('no-clean'))
         {
@@ -147,7 +152,7 @@ class Cron extends BaseCommand
         {
             $this->log(
                 'notice',
-                "Backing up all servers, downloading and moving to [{$remote}]",
+                "Downloading the scheduled backups of all servers and moving them to [{$remote}]",
                 "Starting backup run",
                 ['mode' => 'move', 'remote' => $remote]
             );
@@ -161,7 +166,7 @@ class Cron extends BaseCommand
 
         $this->log(
             'notice',
-            "Backing up all servers, downloading only - {$reason}",
+            "Downloading the scheduled backups of all servers, without moving them - {$reason}",
             "Starting backup run",
             ['mode' => 'download', 'reason' => $reason]
         );

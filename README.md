@@ -2,14 +2,16 @@
 
 [![ci](https://github.com/hampel/blbackup/actions/workflows/ci.yml/badge.svg)](https://github.com/hampel/blbackup/actions/workflows/ci.yml)
 
-Backs up [BinaryLane](https://www.binarylane.com.au/) VPS servers. It takes a snapshot through the
-BinaryLane API, downloads the compressed disk image with `wget`, verifies it with `zstd`, moves it
-to cloud storage with `rclone`, and expires old backups.
+Backs up [BinaryLane](https://www.binarylane.com.au/) VPS servers. It downloads the backups
+BinaryLane takes on each server's schedule as compressed disk images with `wget`, verifies them with
+`zstd`, moves them to cloud storage with `rclone`, and expires old ones.
 
 ## Requirements
 
 - PHP 8.3 or later, with `ext-intl`
 - A BinaryLane API token
+- **Scheduled backups enabled in BinaryLane** for each server you want backed up — daily, weekly
+  or monthly. A server with none is skipped. See [Why scheduled backups](#why-scheduled-backups)
 - [`wget`](https://www.gnu.org/software/wget/) and [`zstd`](https://facebook.github.io/zstd/)
 - [rclone](https://rclone.org/) with a configured remote — optional, see
   [Where backups end up](#where-backups-end-up)
@@ -18,17 +20,30 @@ to cloud storage with `rclone`, and expires old backups.
 ## How it works
 
 ```text
-create  →  download  →  check  →  move  →  clean
+download  →  check  →  move  →  clean
 ```
 
-1. **create** asks the API for a backup and waits for it to finish.
-2. **download** fetches the image as a `.zst` file.
-3. **check** runs `zstd --test` on it, and deletes it if the test fails.
-4. **move** moves it to the rclone remote.
-5. **clean** deletes backups older than `KEEPONLY_DAYS`, locally and on the remote, except the
+1. **download** fetches the newest completed backup BinaryLane has taken, as a `.zst` file.
+2. **check** runs `zstd --test` on it, and deletes it if the test fails.
+3. **move** moves it to the rclone remote.
+4. **clean** deletes backups older than `KEEPONLY_DAYS`, locally and on the remote, except the
    most recent `KEEPLEAST_DAYS` days of each server.
 
 Each stage can be run on its own. `blbackup cron` runs them all, and is what cron should call.
+`create` takes a backup on demand, for use by hand; `cron` does not call it.
+
+### Why scheduled backups
+
+**BinaryLane allows at most two temporary backups per server in any seven days.** Earlier versions
+took one per server every night with `create`, which that limit breaks. Scheduled backups are not
+subject to it and download like any other, so `cron` uses those instead.
+
+- **A server with no scheduled backups is skipped** by `cron`, and `app:validate` reports how many
+  servers have them. Enable backups on a server in BinaryLane to have it backed up.
+- **A stopped schedule fails the run.** If a server's newest backup is older than its schedule
+  plus `BACKUP_GRACE_HOURS`, `download` reports it.
+- **BinaryLane's backup hour is approximate**, and backups can finish hours after it. Run `cron`
+  after your servers' backups have finished, or it downloads the previous day's.
 
 ## Installation
 
@@ -124,6 +139,7 @@ shows what an install resolved to. Credentials are never printed.
 | `APP_TIMEZONE` | `UTC` | For filename datestamps and log records |
 | `DOWNLOAD_PATH` | `storage/backups` | Where images are downloaded to |
 | `DOWNLOAD_TIMEOUT` | `3600` | Seconds to wait for a backup to be taken |
+| `BACKUP_GRACE_HOURS` | `12` | How late a scheduled backup may be before `download` fails it |
 | `KEEPONLY_DAYS` | `7` | Age at which `clean` deletes a backup |
 | `KEEPLEAST_DAYS` | `3` | Days of each server's backups `clean` always keeps. `0` turns it off |
 | `INCLUDE_FILE` / `EXCLUDE_FILE` | — | Server lists for `--all`. See [Server lists](#server-lists) |
@@ -161,7 +177,8 @@ blbackup app:validate [--offline] [--unattended] [--no-api] [--strict] [-d|--dow
 
 ### cron
 
-Runs `create --all --download`, then `clean`. It never prompts, and has no `--dry-run`.
+Runs `download --all`, then `clean`. It takes no backups of its own, never prompts, and has no
+`--dry-run`.
 
 - If `RCLONE_REMOTE` is set, images are moved to the remote and `clean` expires it too.
 - `--no-move` downloads only, for one run. The remote is still cleaned.
@@ -174,7 +191,7 @@ Runs `create --all --download`, then `clean`. It never prompts, and has no `--dr
 options override them for one run.
 
 - **They apply only to `--all`.** A server named on the command line is always processed.
-- With neither set, every server on the account is backed up.
+- With neither set, every server on the account with scheduled backups is downloaded.
 - A list file that does not exist fails the run. An empty list is ignored.
 
 ### clean
@@ -192,6 +209,10 @@ stops being backed up keeps its last good ones:
 - `clean -v` says how many files it kept; `-vvv` lists them.
 
 ### download
+
+Downloads the newest **completed** backup — one still being taken is passed over. `--all`
+downloads only servers with scheduled backups; a server named on the command line is downloaded
+whatever its schedule.
 
 Uses `wget` by default; `--no-wget` downloads in-process instead. A file whose size does not match
 the API's is left alone and reported; `--force` downloads it again.
