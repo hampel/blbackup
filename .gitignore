@@ -26,3 +26,11 @@ CLAUDE.local.md
 # covered by ~/.config/git/ignore on this machine, which a clone elsewhere would
 # not have.
 *:Zone.Identifier
+
+# What the compiled binary leaves behind when it is run from the repository root: its
+# storage path is the working directory, so the default lock, the log (and the daily
+# channel's dated copies of it), the download path and the emergency log land here.
+/blbackup.lock
+/blbackup*.log
+/backups/
+/logs/
