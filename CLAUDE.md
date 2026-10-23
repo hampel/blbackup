@@ -434,12 +434,28 @@ knows the tag it came from. A **container has neither a `.git` directory nor a
 git binary**, so it falls back to the string `unreleased` — and that is not
 cosmetic, because `AppServiceProvider` signs every Slack run summary with
 `app()->version()`, so the alerts from that install are signed `unreleased` too.
-`BLBACKUP_VERSION` is how the image is told, taken from a `VERSION` build
-argument in the `Dockerfile`, and `AppServiceProvider::register()` applies it
-over `app.version` — config is already loaded by the time providers register.
+The image is told through a `VERSION` build argument, used twice: the build stage
+passes it to `app:build --build-version`, compiling it into the phar the way a
+release's tag is, and the final stage repeats it as `BLBACKUP_VERSION`, which
+`AppServiceProvider::register()` applies over `app.version` — config is already
+loaded by the time providers register. The second was the only route while the
+image ran the source tree, and is kept because it does no harm now the two agree.
 It is applied there rather than read in `config/app.php` because of the rule
 below. Forgetting the build argument is not silent: `app:validate` warns, and it
 is the gate a rebuild has to pass anyway.
+
+**The image runs the compiled phar, not the source tree** (since 2026-10-23). The
+`Dockerfile` has a build stage that does what `composer build` does —
+`composer install --no-dev`, then `app:build`, then the dev-dependency grep — and
+the final stage holds only the phar, at `/app/blbackup` so that `php blbackup cron`
+and the `/app/.env` mount are unchanged. Running the source tree, the container
+listed six commands no release has (`app:build`, `app:install`, `app:rename`,
+`make:command`, `make:test`, `test`), because `config/app.php` names the
+environment `development` as a literal that only `app:build` replaces — `APP_ENV`
+does not reach it. CI's container job now fails if any of the six appear.
+`LARAVEL_STORAGE_PATH=/app/storage` is set in the image, because a phar's storage
+path is otherwise its working directory, and that keeps every default under it
+where it was before.
 
 **Never put an `env()` call in `config/app.php`.** `app:build` evaluates that file
 on the build machine and compiles it in as a literal array, so the value freezes

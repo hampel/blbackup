@@ -113,6 +113,16 @@ jobs:
           docker run --rm blbackup:ci php blbackup app:config --only=application \
             | grep -q 'ci-version-check'
 
+          # the image runs the compiled phar, so it lists what a release lists.
+          # Run from the source tree it listed app:build, make:command, test and
+          # three more, because config/app.php names the environment
+          # `development` as a literal that only app:build replaces
+          if docker run --rm blbackup:ci php blbackup list --raw \
+              | grep -qE '^(app:build|app:install|app:rename|make:[a-z]+|test)[[:space:]]'; then
+            echo 'The image lists development commands'
+            exit 1
+          fi
+
           # a mistyped command must exit non-zero: this tool's exit code is the
           # whole of what cron reads
           if docker run --rm blbackup:ci php blbackup app:validte; then

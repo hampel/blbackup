@@ -6,6 +6,17 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The container image runs the compiled phar** rather than the source tree. A build stage
+  compiles it the way a release is compiled, and the image holds only the phar and the tools it
+  runs. The container previously listed six development commands — `app:build`, `make:command`,
+  `test` and three more — that no release has, because the source tree reports itself as a
+  development environment. Nothing outside the image changes: `php blbackup cron`, the `/app/.env`
+  mount, the `VERSION` build argument and every storage default are where they were.
+
 ## [3.0.0] - 2026-10-23
 
 ### Changed
