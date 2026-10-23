@@ -6,7 +6,7 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-10-23
 
 ### Changed
 
@@ -19,6 +19,11 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **`download --all` downloads only servers with scheduled backups**, and **any download picks the
   newest completed backup**, passing over one still being taken. A server named on the command
   line is downloaded whatever its schedule.
+- **Dependencies updated**: `hampel/binarylane-api-laravel` 0.7.1 and `hampel/binarylane-api`
+  1.0.0, `illuminate/*` 13.38.0 and Guzzle 7.16.0 among them. The client's changes are
+  documentation on every path this tool uses.
+- **Tests run on Pest 4** (PHPUnit 12), from Pest 3. A development dependency only — nothing in
+  the shipped binary changes, and the constraint is now `^4` rather than a pinned patch of 3.
 
 ### Added
 
@@ -26,9 +31,6 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `download`, so a schedule that stops is reported rather than skipped every night as already
   downloaded. The stale backup is still downloaded.
 - **`app:validate` reports how many servers have scheduled backups**, and warns when none do.
-
-- **Tests run on Pest 4** (PHPUnit 12), from Pest 3. A development dependency only — nothing in
-  the shipped binary changes, and the constraint is now `^4` rather than a pinned patch of 3.
 
 ## [2.9.1] - 2026-10-10
 
@@ -612,7 +614,8 @@ below follows from fixing that.
 - **20 dependency advisories, one high, now none.** A year of updates applied
   behind the new test suite.
 
-[Unreleased]: https://github.com/hampel/blbackup/compare/2.9.1...HEAD
+[Unreleased]: https://github.com/hampel/blbackup/compare/3.0.0...HEAD
+[3.0.0]: https://github.com/hampel/blbackup/compare/2.9.1...3.0.0
 [2.9.1]: https://github.com/hampel/blbackup/compare/2.9.0...2.9.1
 [2.9.0]: https://github.com/hampel/blbackup/compare/2.8.2...2.9.0
 [2.8.2]: https://github.com/hampel/blbackup/compare/2.8.1...2.8.2
