@@ -103,6 +103,15 @@ which servers it visits and what it checks:
 `create` is unchanged and still takes a temporary backup — the right tool by
 hand, within the limit. **Do not put it back into `cron`.**
 
+**BinaryLane can answer an action with one already running**, measured for `uptime` on
+2026-11-23 (a second request while the first ran came back with the first's id) and not
+measured for `take_backup`, since that costs two real temporary backups. If backups behave the
+same, `create` run while a backup is already in progress on that server waits on that one and
+reports it as its own, with the elapsed time counted from its own request. The backup is real
+and its outcome right, so only the attribution would be wrong, and the lock rules out blbackup
+racing itself. No guard was added for a case not seen; comparing the action's `startedAt`
+with the request time is the fix if it ever matters.
+
 ## Architecture
 
 **Everything that talks to BinaryLane goes through `hampel/binarylane-api-laravel`.**

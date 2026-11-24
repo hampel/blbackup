@@ -31,6 +31,8 @@ download  →  check  →  move  →  clean
 
 Each stage can be run on its own. `blbackup cron` runs them all, and is what cron should call.
 `create` takes a backup on demand, for use by hand; `cron` does not call it.
+If a backup is already running on that server, BinaryLane may hand back that one rather than
+start another, and `create` then reports it as its own.
 
 ### Why scheduled backups
 
