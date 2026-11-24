@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Process;
 | decoded request body.
 */
 
-function slackTransport(array &$history, array $responses = null): SlackWebhook
+function slackTransport(array &$history, ?array $responses = null): SlackWebhook
 {
     $stack = HandlerStack::create(new MockHandler($responses ?: [new Response(200, [], 'ok')]));
     $stack->push(Middleware::history($history));
@@ -206,7 +206,7 @@ it('formats durations at the boundaries', function () {
 | the work. Stages run by hand say nothing - somebody is already watching them.
 */
 
-function interceptSummary(array &$history, string $notify = 'always', string $webhook = 'https://hooks.slack.test/abc', array $responses = null): void
+function interceptSummary(array &$history, string $notify = 'always', string $webhook = 'https://hooks.slack.test/abc', ?array $responses = null): void
 {
     $transport = slackTransport($history, $responses);
 
