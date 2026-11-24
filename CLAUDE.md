@@ -799,8 +799,11 @@ extend the class. Keep new helpers on the contract.
 - **`config.platform.php` is pinned to `8.3.0`, the floor**, so `composer update` resolves the
   lock for the oldest PHP the tool supports rather than for whatever the dev box runs. Without
   it, on 2026-11-24 the box's PHP 8.5 resolved Symfony 8.1, which needs 8.4: the lock would have
-  failed `composer install` in the image's PHP 8.3 build stage and in CI's 8.3 job. Five sibling
+  failed `composer install` in CI's 8.3 job and for anyone installing on the floor. Five sibling
   tools already carried the same pin. It moves when the floor does, and only then.
+- **The container image runs PHP 8.5, not the floor** (since 3.0.2). The floor is a promise to
+  whoever runs the published phar; the image is one installation, so it takes the newest
+  supported release, and CI tests both 8.3 and 8.5. The phar build jobs stay on 8.3.
 - `phpunit.xml.dist` names both `tests/Unit` and `tests/Feature` as testsuites,
   and Pest exits 2 if either directory is missing — don't leave one empty.
 

@@ -14,7 +14,7 @@
 # app:build replaces - so the container listed app:build, make:command, test and
 # three more that no release has, and ran something no release had ever been.
 
-FROM php:8.3-cli AS build
+FROM php:8.5-cli AS build
 
 # libicu-dev and intl: composer.json requires ext-intl, so the install refuses
 # without it. unzip: Composer unpacks dist archives with it.
@@ -58,7 +58,10 @@ RUN php blbackup app:build blbackup --build-version="${VERSION:-unreleased}" --n
     fi
 
 
-FROM php:8.3-cli
+# PHP 8.5, not the 8.3 floor. The floor is what the published phar promises and
+# what the lock is resolved for (config.platform.php); this image is one
+# installation, and it runs the newest supported release, which CI also tests.
+FROM php:8.5-cli
 
 # zstd verifies a downloaded backup, wget fetches it, rclone ships it to
 # secondary storage; the paths to all three are configurable, and app:validate

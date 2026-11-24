@@ -36,10 +36,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 8.3 is the floor composer.json declares and what the container runs.
-        # Nothing runs this tool on anything newer yet; add a version here when
-        # something does, rather than testing a platform nobody deploys on.
-        php: ['8.3']
+        # 8.3 is the floor composer.json declares; 8.5 is what the container
+        # image runs. Add a version here when something deploys on it, rather
+        # than testing a platform nobody runs.
+        php: ['8.3', '8.5']
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

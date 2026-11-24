@@ -14,6 +14,8 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `hampel/binarylane-api` 1.0.3, with `illuminate/*` 13.43.0, Symfony 7.4.23 and Guzzle 7.17.0
   among them. The client's API is declared stable at 1.0 with no change to anything this tool
   calls. The update clears seven Symfony advisories, none of which reach a command-line tool.
+- **The container image runs PHP 8.5**, from 8.3. The supported floor for the phar is unchanged
+  at 8.3, and CI now tests both.
 
 ## [3.0.1] - 2026-10-23
 
