@@ -18,7 +18,7 @@
     "require": {
         "php": "^8.3",
         "ext-intl": "*",
-        "hampel/binarylane-api-laravel": "^0.7",
+        "hampel/binarylane-api-laravel": "^1.0",
         "hampel/console-report": "^2.2",
         "hampel/slack-message": "^2.2",
         "illuminate/http": "^13.0",
@@ -48,6 +48,9 @@
         "optimize-autoloader": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true
+        },
+        "platform": {
+            "php": "8.3.0"
         }
     },
     "scripts": {

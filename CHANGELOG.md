@@ -6,6 +6,15 @@ history only.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Dependencies updated**: `hampel/binarylane-api-laravel` 1.0.1, from 0.7.1, and
+  `hampel/binarylane-api` 1.0.3, with `illuminate/*` 13.43.0, Symfony 7.4.23 and Guzzle 7.17.0
+  among them. The client's API is declared stable at 1.0 with no change to anything this tool
+  calls. The update clears seven Symfony advisories, none of which reach a command-line tool.
+
 ## [3.0.1] - 2026-10-23
 
 ### Changed
